@@ -1,0 +1,17 @@
+# KallistiOS ##version##
+#
+# mke2fs/Makefile.nonkos
+# Copyright (C) 2013 Lawrence Sebald
+#
+
+all: mke2fs.kos
+CFLAGS += -I$(KOS_BASE)/addons/libkosext2fs -DEXT2_NOT_IN_KOS -Wall -std=gnu99
+#CFLAGS += -DEXT2FS_DEBUG
+
+mke2fs.kos: mke2fs.c
+	$(CC) $(CFLAGS) -g -o mke2fs.kos mke2fs.c
+
+clean:
+	-rm -f mke2fs.kos
+	-rm -rf mke2fs.kos.dSYM
+
