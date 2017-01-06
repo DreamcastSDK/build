@@ -246,7 +246,7 @@ gnu_download_tool ()
   then
     echo "${tool} already downloaded."
   else
-    echo "Locating ${target}..."
+    echo -n "Locating ${target}.."
 # check the locations it /might/ be
     for directory in \
         "${urlbase}/${tool}" \
@@ -257,6 +257,7 @@ gnu_download_tool ()
         "${urlbase}/${tool}/snapshots/${target}" \
         "error"
     do
+      echo -n "."
       if [ ${directory} = "error" ]
       then
         log_error "Unable to locate ${target} on server"
@@ -269,6 +270,7 @@ gnu_download_tool ()
         output=`grep "${target}.tar" checksums.txt`
         if [ "${output}" != "" ]
         then
+          echo " found."
           break
         fi
       fi
