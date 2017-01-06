@@ -71,6 +71,16 @@ log_warning () {
   echo_warning "$1" | tee -a ${log}
 }
 
+# Function to detect if a program is usable
+
+# @param[in] $1 program
+
+# @return the result of the underlying call or 1 if no utility is found
+detect () {
+  eval "${1} --version >> /dev/null 2>&1"
+  return $?
+}
+
 # Function to download a file
 
 # @param[in] $1 url
@@ -84,8 +94,7 @@ download ()
   outfile=$2
   options=$3
 
-  wget --version >> /dev/null 2>&1
-  if [ $? -eq 0 ]
+  if detect "wget"
   then
     case ${options} in
       silent)
@@ -95,22 +104,19 @@ download ()
         wget --quiet --show-progress --progress=bar:force:noscroll --continue --output-document="${outfile}" ${url}
       ;;
     esac
+  elif detect "curl"
+  then
+    case ${options} in
+      silent)
+        curl -C - --silent --url "${url}" --output "${outfile}"
+      ;;
+      *)
+        curl -C - --progress-bar --url "${url}" --output "${outfile}"
+      ;;
+    esac
   else
-    curl --version >> /dev/null 2>&1
-    if [ $? -eq 0 ]
-    then
-      case ${options} in
-        silent)
-          curl -C - --silent --url "${url}" --output "${outfile}"
-        ;;
-        *)
-          curl -C - --progress-bar --url "${url}" --output "${outfile}"
-        ;;
-      esac
-    else
-      log_error "no download utility found"
-      return 1
-    fi
+    log_error "no download utility found"
+    return 1
   fi
   return $?
 }
@@ -142,104 +148,54 @@ unpack ()
   fi
 }
 
-
-
-# Function to clone a git repository, checking out the relevant branch.
-
-# The cloned repository will name its remote "KallistiOS".
-
-# @param[in] $1  The tool to clone
-# @param[in] $2  The full repository URL
-# @param[in] $3  The branch to checkout
-
-# @return 0 on success, 1 on failure. Note that failure to remove components
-#         when --force is in action is not considered a failure.
-clone_tool()
-{
-  tool=$1
-  repo_url=$2
-  branch=$3
-
-  # If old source exists, delete
-  if [ "${force}" = "true" ]
-  then
-    if ! rm -rf ${tool} >> ${log} 2>&1
-    then
-      log_warning "Unable to delete old ${tool}"
-    fi
-  fi
-
-  # Clone git repository if it does not already exist
-  if [ -e ${tool} ]
-  then
-    echo "${tool} already cloned."
-  else
-    echo "Cloning ${tool}..."
-    if ! git clone -q -o KallistiOS -b ${branch} ${repo_url} ${tool} >> ${log} 2>&1
-    then
-      log_error "Unable to clone ${tool}"
-      return 1
-    fi
-  fi
-}
-
 # Function to either download a tool or clone a git repository from GitHub,
 # checking out the relevant branch.
 
-# @param[in] $1 The GitHub repo (within KallistiOS) to clone/download.
+# @param[in] $1 The repo to clone/download.
 # @param[in] $2 The branch to checkout/download.
-# @param[in] $3 Github organization.
+# @param[in] $3 The user/organization.
 
 # @return  The result of the underlying call to clone or download a tool.
-github_tool ()
+git_tool ()
 {
   repo=$1
   branch=$2
   organization=$3
 
-  if [ "${clone}" = "true" ]
-  then
-    # If old source exists, delete
-    if [ "${force}" = "true" ]
-    then
-      if ! rm -rf ${repo} >> ${log} 2>&1
-      then
-        log_warning "Unable to delete old ${tool}"
-      fi
-    fi
-
-    # Clone git repository if it does not already exist
-    if [ -e ${repo} ]
-    then
-      echo "${repo} already cloned."
-    else
-      echo "Cloning ${repo}..."
-      if ! git clone -q -b ${branch} ${git_transport_prefix}/${organization}/${repo}.git >> ${log} 2>&1
-      then
-        log_error "Unable to clone ${tool}"
-        return 1
-      fi
-    fi
-
-#    clone_tool "${git_transport_prefix}/${organization}/${repo}" "${branch}"
-  else
   # If --force is in action and old source exists, attempt delete
-    if [ "${repo}" = "true" ]
+  # If old source exists, delete
+  if [ "${force}" = "true" ]
+  then
+    if ! rm -rf ${repo} >> ${log} 2>&1
     then
-      if ! rm -rf ${repo} >> ${log} 2>&1
-      then
-        log_warning "Unable to delete old ${repo}"
-      fi
+      log_warning "Unable to delete old ${tool}"
+    fi
+  fi
+
+  if [ -e "${repo}" ]
+  then
+    echo "${repo} already downloaded."
+  elif [ "${clone}" = "true" ]
+  then
+    echo "Cloning ${repo}..."
+    if ! git clone -q -b ${branch} ${git_transport_prefix}/${organization}/${repo}.git >> ${log} 2>&1
+    then
+      log_error "Unable to clone ${tool}"
+      return 1
+    fi
+  else
+    echo "Downloading repository: \"${repo}\" - branch: \"${branch}\""
+    if ! download "${git_transport_prefix}/${organization}/${repo}/archive/${branch}.tar.gz" "${repo}-${branch}.tar.gz"
+    then
+      log_error "Unable to download ${tool}"
+      return 1
     fi
 
-    if [ -e "${repo}" ]
+    echo "Unpacking ${repo}..."
+    if ! unpack "${repo}-${branch}.tar.gz" "${repo}"
     then
-      echo "${repo} already downloaded."
-    else
-      echo "Downloading repository: \"${repo}\" - branch: \"${branch}\""
-      download "${git_transport_prefix}/${organization}/${repo}/archive/${branch}.tar.gz" "${repo}-${branch}.tar.gz"
-      echo "Unpacking ${repo}..."
-      unpack "${repo}-${branch}.tar.gz" "${repo}"
+      log_error "Unable to unpack ${repo}"
+      return 1
     fi
   fi
 }
@@ -409,7 +365,7 @@ download_components()
           organization="KallistiOS"
         fi
 
-        if ! github_tool "${repo}" "${branch}" "${organization}"
+        if ! git_tool "${repo}" "${branch}" "${organization}"
         then
           res="fail"
           break
@@ -581,6 +537,7 @@ then
   echo "Downloads complete"
 else
   echo "Downloads incomplete - see log for failures"
+  return 1
 fi
 
 
