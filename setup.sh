@@ -81,6 +81,11 @@ detect () {
   return $?
 }
 
+# Function forwards value for use in "if" statements
+
+rval () { return ${1}; }
+
+
 # Function to download a file
 
 # @param[in] $1 url
@@ -88,13 +93,15 @@ detect () {
 # @param[in] $3 options (optional)
 
 # @return the result of the underlying call or 1 if no utility is found
+detect "wget";has_wget=$?
+detect "curl";has_curl=$?
 download ()
 {
   url=$1
   outfile=$2
   options=$3
 
-  if detect "wget"
+  if rval ${has_wget}
   then
     case ${options} in
       silent)
@@ -104,7 +111,7 @@ download ()
         wget --quiet --show-progress --progress=bar:force:noscroll --continue --output-document="${outfile}" ${url}
       ;;
     esac
-  elif detect "curl"
+  elif rval ${has_curl}
   then
     case ${options} in
       silent)
@@ -207,6 +214,9 @@ git_tool ()
 # @param[in] $3 gnu mirror URL (optional)
 
 # @return 0 on success, anything else indicates failure
+detect "gzip";has_gzip=$?
+detect "bzip2";has_bzip2=$?
+detect "xz";has_xz=$?
 gnu_download_tool ()
 {
   tool=$1
@@ -270,20 +280,26 @@ gnu_download_tool ()
 
       case `echo ${line} | cut -d ':' -f 2` in
         gz)
-          if [ "${filename}" = "" ]
+          if [ "${filename}" = "" ] && rval ${has_gzip}
           then
             sha512sum=${this_sha512sum}
             filename=${target}.tar.gz
           fi
         ;;
         bz2)
+        if rval ${has_bzip2}
+        then
           sha512sum=${this_sha512sum}
           filename=${target}.tar.bz2
+          fi
         ;;
         xz)
-          sha512sum=${this_sha512sum}
-          filename=${target}.tar.xz
-          break
+          if rval ${has_xz}
+          then
+            sha512sum=${this_sha512sum}
+            filename=${target}.tar.xz
+            break
+          fi
         ;;
         *)
           log_error "parsing checksums.txt for ${target} from ${directory}"
