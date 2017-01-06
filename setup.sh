@@ -252,8 +252,8 @@ gnu_download_tool ()
         log_error "Unable to locate ${target} on server"
         return 1
       fi
-      rm checksums.txt >> /dev/null 2>&1
-      touch checksums.txt >> /dev/null 2>&1
+      rm -f checksums.txt
+      touch checksums.txt
       if download "${directory}/sha512.sum" "checksums.txt" "silent"
       then
         output=`grep "${target}.tar" checksums.txt`
@@ -314,7 +314,7 @@ gnu_download_tool ()
       fi
     fi
 
-    rm checksums.txt >> /dev/null 2>&1
+    rm -f checksums.txt
 
     echo "Unpacking ${target}..."
     if ! unpack "${filename}"
@@ -335,7 +335,6 @@ download_components()
   IFS="
 " # We only want the newline character
 
-  res="ok"
   for line in `cat ${basedir}/components.conf | grep -v '^#' | grep -v '^$'`
   do
     class=`echo ${line} | cut -d ':' -f 1`
@@ -347,8 +346,7 @@ download_components()
 
         if ! gnu_download_tool "${name}" "${version}" "${forced_url}"
         then
-          res="fail"
-          break
+          return 1
         fi
       ;;
 
@@ -367,8 +365,7 @@ download_components()
 
         if ! git_tool "${repo}" "${branch}" "${organization}"
         then
-          res="fail"
-          break
+          return 1
         fi
       ;;
 
@@ -378,8 +375,7 @@ download_components()
 
         if ! lib_tool "${name}" "${url}"
         then
-          res="fail"
-          break
+          return 1
         fi
       ;;
 
@@ -392,7 +388,6 @@ download_components()
 
   # Restore IFS before returning
   IFS=${OLD_IFS}
-  [ "${res}" = "ok" ]
 }
 
 
@@ -429,7 +424,6 @@ gnu_url="ftp://gcc.gnu.org/pub"
 basedir=`dirname $0`
 basedir=`absolutedir "${basedir}"`
 builddir="${basedir}/builds"
-originaldir=`pwd`
 
 installdir="/usr"
 
@@ -527,18 +521,12 @@ echo "Logging to ${log}"
 # Download all components defined in 'components.conf'
 if ! download_components
 then
-  cd "${originaldir}"
   log_error "Failed to download some components"
+  echo "Downloads incomplete - see log for details"
   exit 1
 fi
 
-if [ "${res}" = "ok" ]
-then
-  echo "Downloads complete"
-else
-  echo "Downloads incomplete - see log for failures"
-  return 1
-fi
+echo "Downloads complete"
 
 
 ################################################################################
@@ -555,5 +543,3 @@ do
 #make -C ${dir} install DESTDIR="${installdir}" >> ${log} 2>&1
 
 done
-
-cd "${originaldir}"
