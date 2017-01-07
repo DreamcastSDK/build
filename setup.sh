@@ -396,9 +396,8 @@ download_components()
 
   for line in `cat ${basedir}/components.conf | grep -v '^#' | grep -v '^$'`
   do
-    class=`echo ${line} | cut -d ':' -f 1`
-    case ${class} in
-      toolchain)
+    case ${line} in
+      toolchain:*)
         name=`      echo ${line} | cut -d ':' -f 2`
         version=`   echo ${line} | cut -d ':' -f 3`
         forced_url=`echo ${line} | cut -d ':' -f 4`
@@ -409,7 +408,7 @@ download_components()
         fi
       ;;
 
-      dreamcast)
+      dreamcast:*)
         repo=`  echo ${line} | cut -d ':' -f 2`
         branch=`echo ${line} | cut -d ':' -f 3`
         organization=`  echo ${line} | cut -d ':' -f 4`
@@ -428,7 +427,7 @@ download_components()
         fi
       ;;
 
-      lib)
+      lib:*)
         name=`echo ${line} | cut -d ':' -f 2`
         url=` echo ${line} | cut -d ':' -f 3`
 
@@ -439,7 +438,7 @@ download_components()
       ;;
 
       *)
-        echo Ignoring ${class} ${tool}
+        echo Unrecognized prefix!
       ;;
     esac
   done
