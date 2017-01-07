@@ -53,11 +53,13 @@ echo_error () {
   echo "ERROR: $1"
 }
 
+
 # Function to print an error to stdout
 # @param[in] $1 message
 echo_warning () {
   echo "WARNING: $1"
 }
+
 
 # Function to record error to log
 # @param[in] $1 message
@@ -65,11 +67,50 @@ log_error () {
   echo_error "$1" | tee -a ${log}
 }
 
+
 # Function to record warning to log
 # @param[in] $1 message
 log_warning () {
   echo_warning "$1" | tee -a ${log}
 }
+
+
+# Function to detect if a program is usable
+# @param[in] $1 input string e.g. --flagname=value
+# @return "value"
+getvalue () {
+  echo "${1}" | sed -e "s/--[a-z]*=\(.*\)/\1/"
+}
+
+
+# Function to detect if a program is usable
+# @param[in] $1 program name
+# @param[in] $2 program directory
+assert_dir () {
+  if [ ! -e "${2}" ]
+  then
+    error_log "Directory for ${1} is missing! Expected: ${2}"
+    exit 1
+  fi
+}
+
+
+# Function to check for relative directory and makes it absolute
+
+# @param[in] $1  The directory to make absolute if necessary.
+absolutedir()
+{
+  case ${1} in
+    /*)
+      echo "${1}"
+    ;;
+
+    *)
+      echo "${PWD}/${1}"
+    ;;
+  esac
+}
+
 
 # Function to detect if a program is usable
 
@@ -82,7 +123,6 @@ detect () {
 }
 
 # Function forwards value for use in "if" statements
-
 rval () { return ${1}; }
 
 
@@ -223,6 +263,7 @@ gnu_download_tool ()
   version=$2
   target=${tool}-${version}
   urlbase=$3
+  eval "${tool}_dir=${target}"
 
   if [ "${urlbase}" = "" ]
   then
@@ -409,23 +450,6 @@ download_components()
 }
 
 
-# Function to check for relative directory and makes it absolute
-
-# @param[in] $1  The directory to make absolute if necessary.
-absolutedir()
-{
-  case ${1} in
-    /*)
-      echo "${1}"
-    ;;
-
-    *)
-      echo "${PWD}/${1}"
-    ;;
-  esac
-}
-
-
 ################################################################################
 #                                                                              #
 #                              Parse arguments                                 #
@@ -433,16 +457,13 @@ absolutedir()
 ################################################################################
 
 # Defaults
-
 force="false"
 clone="false"
 git_transport_prefix="https://github.com"
 gnu_url="ftp://gcc.gnu.org/pub"
 
-basedir=`dirname $0`
-basedir=`absolutedir "${basedir}"`
-builddir="${basedir}/builds"
-
+basedir=$(absolutedir `dirname $0`)
+builddir=$(absolutedir "${basedir}/builds")
 installdir="/usr"
 
 until
@@ -453,10 +474,6 @@ until
       force="true"
     ;;
 
-    --no-force)
-      force="false"
-    ;;
-
     --clone)
       clone="true"
     ;;
@@ -465,18 +482,20 @@ until
       clone="false"
     ;;
 
-    --ssh)
-      git_transport_prefix="git@github.com:"
+    --builddir=*)
+      builddir=$(absolutedir $(getvalue ${opt}))
     ;;
 
-    --https)
-      git_transport_prefix="https://github.com"
+    --installdir=*)
+      installdir=$(absolutedir $(getvalue ${opt}))
     ;;
+
 
     ?*)
-      echo "Usage: ./setup.sh [--force | --no-force]"
+      echo "Usage: ./setup.sh [--force]"
       echo "                  [--clone | --download]"
-      echo "                  [--https | --ssh]"
+      echo "                  [--builddir=<dir>]"
+      echo "                  [--installdir=<dir>]"
       echo "                  [--help | -h]"
       exit 1
     ;;
@@ -553,11 +572,27 @@ echo "Downloads complete"
 #                                                                              #
 ################################################################################
 
-for dir in `ls -1 -d -b ${builddir}/*/`
-do
-  echo dir: ${dir}
+assert_dir "Binutils" "${binutils_dir}"
+assert_dir "GCC" "${gcc_dir}"
+assert_dir "GDB" "${gdb_dir}"
+assert_dir "Newlib" "${newlib_dir}"
+
+cd "${builddir}/${binutils_dir}"
+sh configure --target=sh-elf
+
+
+
+cd "${builddir}"
+
+
+#Binutils (sh-elf): --target=sh-elf
+#GCC pass 1 (sh-elf): --target=sh-elf --without-headers --with-newlib --enable-languages=c --disable-libssp --disable-tls --with-multilib-list=m4-single-only,m4-nofpu,m4 --with-endian=little --with-cpu=m4-single-only
+#Newlib (sh-elf): --target=sh-elf --with-multilib-list=m4-single-only,m4-nofpu,m4 --with-endian=little --with-cpu=m4-single-only
+#GCC pass 2 (sh-elf): --target=sh-elf --with-newlib --enable-languages=c,c++,objc,obj-c++ --disable-libssp --disable-tls --with-multilib-list=m4-single-only,m4-nofpu,m4 --with-endian=little --with-cpu=m4-single-only --enable-threads=kos
+
+#Binutils (arm-eabi): --target=arm-eabi
+#GCC (arm-eabi): --target=arm-eabi --without-headers --with-newlib --enable-languages=c --disable-tls --disable-libssp --with-arch=armv4
+
 
 #make -j${makejobs} -C ${dir} DESTDIR="${installdir}" >> ${log} 2>&1
 #make -C ${dir} install DESTDIR="${installdir}" >> ${log} 2>&1
-
-done
