@@ -52,7 +52,7 @@ getvalue () {
 assert_dir () {
   if [ ! -e "${2}" ]
   then
-    error_log "Directory for ${1} is missing! Expected: ${2}"
+    log_error "Directory for ${1} is missing! Expected: ${2}"
     exit 1
   fi
 }
@@ -536,7 +536,6 @@ echo "Downloads complete"
 #                              Build everything                                #
 #                                                                              #
 ################################################################################
-
 assert_dir "Binutils" "${binutils_dir}"
 assert_dir "GCC" "${gcc_dir}"
 assert_dir "GDB" "${gdb_dir}"
