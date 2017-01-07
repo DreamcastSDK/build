@@ -1,41 +1,5 @@
 #!/bin/sh
 
-# Usage:
-
-# ./setup.sh [--force | --no-force]
-#            [--clone | --download]
-#            [--https | --ssh]
-#            [--help | -h]
-
-# --force | --no-force
-
-#     If --force is specified, attempt to remove the existing repository
-#     before cloning or downloading. If the removal fails, the old version
-#     will be used, but a warning printed.  Default --no-force.
-
-# --clone | --download
-
-#     If --clone is specified, attempt to clone the repository, otherwise if
-#     --download is specified, attempt to download a tarball file of the
-#     repository.  Default --download.
-
-# --https | --ssh
-
-#     If --clone is specified, the --https and --ssh flags are used to
-#     select which transport git should use. Default --https.
-#
-#
-
-# --help | -h
-
-#     Print out a brief help about this script and return with an error code.
-
-# Note that earlier versions allowed specification of a location where the
-# tools were to be downloaded. However recent versions do not download the SDK
-# directory, so the script will only work if downloading is done in a fixed
-# location relative to the pre-existing SDK directory (which contains this
-# script).
-
 # The script returns 1 on failure and 0 on success. Failure to delete a
 # pre-existing version when specifying --force is not considered a failure.
 
@@ -45,7 +9,6 @@
 #                               Shell functions                                #
 #                                                                              #
 ################################################################################
-
 
 # Function to print an error to stdout
 # @param[in] $1 message
@@ -96,7 +59,6 @@ assert_dir () {
 
 
 # Function to check for relative directory and makes it absolute
-
 # @param[in] $1  The directory to make absolute if necessary.
 absolutedir()
 {
@@ -113,9 +75,7 @@ absolutedir()
 
 
 # Function to detect if a program is usable
-
 # @param[in] $1 program
-
 # @return the result of the underlying call or 1 if no utility is found
 detect () {
   eval "${1} --version >> /dev/null 2>&1"
@@ -530,8 +490,6 @@ done
 #                              Initialize setup                                #
 #                                                                              #
 ################################################################################
-
-
 
 # Create and then move to builddir location
 
