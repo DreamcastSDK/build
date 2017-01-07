@@ -246,7 +246,16 @@ gnu_download_tool ()
 # Download and unpack source if it does not already exist
   if [ -e "${target}" ]
   then
-    echo "${tool} already downloaded."
+    echo "${target} already downloaded."
+  elif [ -e `ls ${target}.tar.*` ]
+  then
+    echo "${target} archive already downloaded."
+    echo "Unpacking ${target}..."
+    if ! unpack `ls ${target}.tar.*`
+    then
+      log_error "Unable to unpack ${target}"
+      return 1
+    fi
   else
     echo -n "Locating ${target}.."
 # check the locations it /might/ be
@@ -257,11 +266,13 @@ gnu_download_tool ()
         "${urlbase}/${tool}/${version}" \
         "${urlbase}/${tool}/snapshots" \
         "${urlbase}/${tool}/snapshots/${target}" \
+        "${urlbase}/gcc/infrastructure" \
         "error"
     do
       echo -n "."
       if [ ${directory} = "error" ]
       then
+        echo ""
         log_error "Unable to locate ${target} on server"
         return 1
       fi
@@ -412,7 +423,7 @@ download_components()
 
 ################################################################################
 #                                                                              #
-#                              Parse arguments                                 #
+#                              Detect programs                                 #
 #                                                                              #
 ################################################################################
 
@@ -427,6 +438,24 @@ then
   fi
 fi
 
+has_make=$(detect "make")
+has_gmake=$(detect "gmake")
+if ${has_make}
+then
+  make_tool="make"
+elif ${has_gmake}
+then
+  make_tool="gmake"
+else
+  print_error "no make system installed?!"
+  exit 1
+fi
+
+################################################################################
+#                                                                              #
+#                              Parse arguments                                 #
+#                                                                              #
+################################################################################
 # Defaults
 force="false"
 clone="false"
@@ -533,30 +562,51 @@ echo "Downloads complete"
 
 ################################################################################
 #                                                                              #
-#                              Build everything                                #
+#                              Patch and Build                                 #
 #                                                                              #
 ################################################################################
 assert_dir "Binutils" "${binutils_dir}"
-assert_dir "GCC" "${gcc_dir}"
-assert_dir "GDB" "${gdb_dir}"
-assert_dir "Newlib" "${newlib_dir}"
+assert_dir "GCC"      "${gcc_dir}"
+assert_dir "GDB"      "${gdb_dir}"
+assert_dir "Newlib"   "${newlib_dir}"
+assert_dir "GMP"      "${gmp_dir}"
+assert_dir "MPFR"     "${mpfr_dir}"
+assert_dir "MPC"      "${mpc_dir}"
 
-cd "${builddir}/${binutils_dir}"
-sh configure --target=sh-elf
-
-
-
-cd "${builddir}"
-
-
-#Binutils (sh-elf): --target=sh-elf
-#GCC pass 1 (sh-elf): --target=sh-elf --without-headers --with-newlib --enable-languages=c --disable-libssp --disable-tls --with-multilib-list=m4-single-only,m4-nofpu,m4 --with-endian=little --with-cpu=m4-single-only
-#Newlib (sh-elf): --target=sh-elf --with-multilib-list=m4-single-only,m4-nofpu,m4 --with-endian=little --with-cpu=m4-single-only
-#GCC pass 2 (sh-elf): --target=sh-elf --with-newlib --enable-languages=c,c++,objc,obj-c++ --disable-libssp --disable-tls --with-multilib-list=m4-single-only,m4-nofpu,m4 --with-endian=little --with-cpu=m4-single-only --enable-threads=kos
-
-#Binutils (arm-eabi): --target=arm-eabi
-#GCC (arm-eabi): --target=arm-eabi --without-headers --with-newlib --enable-languages=c --disable-tls --disable-libssp --with-arch=armv4
+ln -s "../${gmp_dir}"  "${gcc_dir}/gmp"  >> ${log} 2>&1
+ln -s "../${mpfr_dir}" "${gcc_dir}/mpfr" >> ${log} 2>&1
+ln -s "../${mpc_dir}"  "${gcc_dir}/mpc"  >> ${log} 2>&1
 
 
-#make -j${makejobs} -C ${dir} DESTDIR="${installdir}" >> ${log} 2>&1
-#make -C ${dir} install DESTDIR="${installdir}" >> ${log} 2>&1
+configure_and_make () {
+  wd_dir=${1}
+  conf_flags=${2}
+  cd ${basedir}
+
+echo "Patching ${wd_dir}..."
+  for patch in `ls -1 patches/*.diff | grep "${wd_dir}"`
+  do
+    patch --forward -d ${builddir}/${wd_dir} -p1 < ${patch}
+  done
+  cd ${builddir}/${wd_dir}
+  echo "Configuring ${wd_dir}..."
+  sh configure ${conf_flags} >> ${log} 2>&1
+  echo "Building ${wd_dir}..."
+  eval "${make_tool} -j${makejobs} DESTDIR=\"${basedir}/output/${wd_dir}\" >> ${log} 2>&1"
+  eval "${make_tool} install DESTDIR=\"${basedir}/output/${wd_dir}\" >> ${log} 2>&1"
+}
+
+target_arch="sh-elf"
+configure_and_make "${binutils_dir}"  "--prefix=${installdir}/${target_arch} --target=${target_arch}"
+configure_and_make "${gdb_dir}"       "--prefix=${installdir}/${target_arch} --target=${target_arch}"
+configure_and_make "${gcc_dir}"       "--prefix=${installdir}/${target_arch} --target=${target_arch} --without-headers --with-newlib --enable-languages=c --disable-libssp --disable-tls --with-multilib-list=m4-single-only,m4-nofpu,m4 --with-endian=little --with-cpu=m4-single-only"
+configure_and_make "${newlib_dir}"    "--prefix=${installdir}/${target_arch} --target=${target_arch} --with-multilib-list=m4-single-only,m4-nofpu,m4 --with-endian=little --with-cpu=m4-single-only"
+configure_and_make "${gcc_dir}"       "--prefix=${installdir}/${target_arch} --target=${target_arch} --with-newlib --enable-languages=c,c++,objc,obj-c++ --disable-libssp --disable-tls --with-multilib-list=m4-single-only,m4-nofpu,m4 --with-endian=little --with-cpu=m4-single-only --enable-threads=kos"
+
+target_arch="arm-eabi"
+configure_and_make "${binutils_dir}"  "--prefix=${installdir}/${target_arch} --target=${target_arch}"
+configure_and_make "${gdb_dir}"       "--prefix=${installdir}/${target_arch} --target=${target_arch}"
+configure_and_make "${gcc_dir}"       "--prefix=${installdir}/${target_arch} --target=${target_arch} --without-headers --with-newlib --enable-languages=c --disable-tls --disable-libssp --with-arch=armv4"
+
+
+
