@@ -119,11 +119,12 @@ absolutedir()
 # @return the result of the underlying call or 1 if no utility is found
 detect () {
   eval "${1} --version >> /dev/null 2>&1"
-  return $?
+  if [ $? -ne 0 ]
+  then
+    echo "false"
+  fi
+  echo "true"
 }
-
-# Function forwards value for use in "if" statements
-rval () { return ${1}; }
 
 
 # Function to download a file
@@ -133,15 +134,15 @@ rval () { return ${1}; }
 # @param[in] $3 options (optional)
 
 # @return the result of the underlying call or 1 if no utility is found
-detect "wget";has_wget=$?
-detect "curl";has_curl=$?
+has_wget=$(detect "wget")
+has_curl=$(detect "curl")
 download ()
 {
   url=$1
   outfile=$2
   options=$3
 
-  if rval ${has_wget}
+  if ${has_wget}
   then
     case ${options} in
       silent)
@@ -151,7 +152,7 @@ download ()
         wget --quiet --show-progress --progress=bar:force:noscroll --continue --output-document="${outfile}" ${url}
       ;;
     esac
-  elif rval ${has_curl}
+  elif ${has_curl}
   then
     case ${options} in
       silent)
@@ -211,7 +212,7 @@ git_tool ()
 
   # If --force is in action and old source exists, attempt delete
   # If old source exists, delete
-  if [ "${force}" = "true" ]
+  if ${force}
   then
     if ! rm -rf ${repo} >> ${log} 2>&1
     then
@@ -222,7 +223,7 @@ git_tool ()
   if [ -e "${repo}" ]
   then
     echo "${repo} already downloaded."
-  elif [ "${clone}" = "true" ]
+  elif ${clone}
   then
     echo "Cloning ${repo}..."
     if ! git clone -q -b ${branch} ${git_transport_prefix}/${organization}/${repo}.git >> ${log} 2>&1
@@ -254,9 +255,9 @@ git_tool ()
 # @param[in] $3 gnu mirror URL (optional)
 
 # @return 0 on success, anything else indicates failure
-detect "gzip";has_gzip=$?
-detect "bzip2";has_bzip2=$?
-detect "xz";has_xz=$?
+has_gzip=$(detect "gzip")
+has_bzip2=$(detect "bzip2")
+has_xz=$(detect "xz")
 gnu_download_tool ()
 {
   tool=$1
@@ -274,7 +275,7 @@ gnu_download_tool ()
   sha512sum=""
 
 # If --force is in action and old source exists, attempt delete
-  if [ "${force}" = "true" ]
+  if ${force}
   then
     if ! rm -rf ${target} >> ${log} 2>&1
     then
@@ -323,21 +324,21 @@ gnu_download_tool ()
 
       case `echo ${line} | cut -d ':' -f 2` in
         gz)
-          if [ "${filename}" = "" ] && rval ${has_gzip}
+          if [ "${filename}" = "" ] && ${has_gzip}
           then
             sha512sum=${this_sha512sum}
             filename=${target}.tar.gz
           fi
         ;;
         bz2)
-        if rval ${has_bzip2}
+        if ${has_bzip2}
         then
           sha512sum=${this_sha512sum}
           filename=${target}.tar.bz2
           fi
         ;;
         xz)
-          if rval ${has_xz}
+          if ${has_xz}
           then
             sha512sum=${this_sha512sum}
             filename=${target}.tar.xz
@@ -358,7 +359,7 @@ gnu_download_tool ()
       return 1
     fi
 
-    if [ "${validate}" = "true" ]
+    if ${validate}
     then
       echo "Validating ${target}..."
       checksum=`sha512sum ${filename} | cut -d ' ' -f 1`
@@ -455,6 +456,17 @@ download_components()
 #                                                                              #
 ################################################################################
 
+# Determine the number of processes to use for building
+makejobs=`nproc --all`
+if [ $? -ne 0 ]
+then
+  makejobs=`sysctl hw.ncpu | awk '{print $2}'`
+  if [ $? -ne 0 ]
+  then
+    makejobs="1"
+  fi
+fi
+
 # Defaults
 force="false"
 clone="false"
@@ -489,12 +501,17 @@ until
       installdir=$(absolutedir $(getvalue ${opt}))
     ;;
 
+    --makejobs=*)
+      makejobs=$(getvalue ${opt})
+    ;;
+
 
     ?*)
       echo "Usage: ./setup.sh [--force]"
       echo "                  [--clone | --download]"
       echo "                  [--builddir=<dir>]"
       echo "                  [--installdir=<dir>]"
+      echo "                  [--makejobs=<number>]"
       echo "                  [--help | -h]"
       exit 1
     ;;
@@ -514,16 +531,7 @@ done
 #                                                                              #
 ################################################################################
 
-# Determine the number of processes to use for building
-makejobs=`nproc --all`
-if [ $? -ne 0 ]
-then
-  makejobs=`sysctl hw.ncpu | awk '{print $2}'`
-  if [ $? -ne 0 ]
-  then
-    makejobs="1"
-  fi
-fi
+
 
 # Create and then move to builddir location
 
