@@ -581,31 +581,30 @@ ln -s "../${mpc_dir}"  "${gcc_dir}/mpc"  >> ${log} 2>&1
 configure_and_make () {
   wd_dir=${1}
   conf_flags=${2}
-  cd ${basedir}
 
   echo "Patching ${wd_dir}..."
-  for patchfile in `ls -1 patches/*.diff | grep "${wd_dir}"`
+  for patchfile in `ls -1 ${basedir}/patches/*.diff | grep "${wd_dir}"`
   do
-    patch --forward -d ${builddir}/${wd_dir} -p1 < ${patchfile} >> ${log} 2>&1
+    patch --forward -d ${wd_dir} -p1 < ${patchfile} >> ${log} 2>&1
   done
-  cd ${builddir}/${wd_dir}
   echo "Configuring ${wd_dir}..."
-  sh configure ${conf_flags} >> ${log} 2>&1
+  mkdir -p ${target_arch}/${wd_dir}
+  cd ${target_arch}/${wd_dir}
+  sh ${builddir}/${wd_dir}/configure ${conf_flags} >> ${log} 2>&1
   echo "Building ${wd_dir}..."
   eval "${make_tool} -j${makejobs} >> ${log} 2>&1"
   eval "${make_tool} install >> ${log} 2>&1"
-  eval "${make_tool} make distclean >> ${log} 2>&1"
-  rm ./config.cache >> ${log} 2>&1
+  cd ${builddir}
 }
 
 target_arch="sh-elf"
-configure_and_make "${binutils_dir}"  "--prefix=${installdir} --target=${target_arch}"
-configure_and_make "${gdb_dir}"       "--prefix=${installdir} --target=${target_arch}"
-configure_and_make "${gcc_dir}"       "--prefix=${installdir} --target=${target_arch} --without-headers --with-newlib --enable-languages=c --disable-libssp --disable-tls --with-multilib-list=m4-single-only,m4-nofpu,m4 --with-endian=little --with-cpu=m4-single-only"
-configure_and_make "${newlib_dir}"    "--prefix=${installdir} --target=${target_arch} --with-multilib-list=m4-single-only,m4-nofpu,m4 --with-endian=little --with-cpu=m4-single-only"
-configure_and_make "${gcc_dir}"       "--prefix=${installdir} --target=${target_arch} --with-newlib --enable-languages=c,c++,objc,obj-c++ --disable-libssp --disable-tls --with-multilib-list=m4-single-only,m4-nofpu,m4 --with-endian=little --with-cpu=m4-single-only --enable-threads=kos"
+configure_and_make "${binutils_dir}"  "--disable-werror --prefix=${installdir} --target=${target_arch}"
+configure_and_make "${gdb_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch}"
+configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch} --without-headers --with-newlib --enable-languages=c --disable-libssp --disable-tls --with-multilib-list=m4-single-only,m4-nofpu,m4 --with-endian=little --with-cpu=m4-single-only"
+configure_and_make "${newlib_dir}"    "--disable-werror --prefix=${installdir} --target=${target_arch} --with-multilib-list=m4-single-only,m4-nofpu,m4 --with-endian=little --with-cpu=m4-single-only"
+configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch} --with-newlib --enable-languages=c,c++,objc,obj-c++ --disable-libssp --disable-tls --with-multilib-list=m4-single-only,m4-nofpu,m4 --with-endian=little --with-cpu=m4-single-only --enable-threads=kos"
 
 target_arch="arm-eabi"
-configure_and_make "${binutils_dir}"  "--prefix=${installdir} --target=${target_arch}"
-configure_and_make "${gdb_dir}"       "--prefix=${installdir} --target=${target_arch}"
-configure_and_make "${gcc_dir}"       "--prefix=${installdir} --target=${target_arch} --without-headers --with-newlib --enable-languages=c --disable-tls --disable-libssp --with-arch=armv4"
+configure_and_make "${binutils_dir}"  "--disable-werror --prefix=${installdir} --target=${target_arch}"
+configure_and_make "${gdb_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch}"
+configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch} --without-headers --with-newlib --enable-languages=c --disable-tls --disable-libssp --with-arch=armv4"
