@@ -140,10 +140,14 @@ unpack ()
 {
   filename=$1
   destination=$2
+  echo -n "Unpacking ${filename}... "
   if ! eval "tar xf ${filename}" >> ${log} 2>&1
   then
+    echo "FAILED."
     log_error "Unable to unpack ${filename}"
     return 1
+  else
+    echo "done."
   fi
 
   if [ "x$destination" != "x" ]
@@ -153,6 +157,28 @@ unpack ()
       log_error "Unable to move unpacked dir to ${destination}"
       return 1
     fi
+  fi
+}
+
+# Function to test a file's SHA256 checksum
+
+# @param[in] $1 filename
+# @param[in] $2 expected SH256 checksum
+
+# @return 0 on success, 1 on failure.
+validate_file () {
+  filename=${1}
+  sha512sum=${2}
+
+  echo -n "Validating ${filename}... "
+  checksum=`sha512sum ${filename} | cut -d ' ' -f 1`
+  if [ "${checksum}" != "${sha512sum}" ]
+  then
+    echo "INVALID!"
+    print_error "checksum failure: expected ${sha512sum} but got ${checksum}"
+    return 1
+  else
+    echo "valid."
   fi
 }
 
@@ -199,7 +225,6 @@ git_tool ()
       return 1
     fi
 
-    echo "Unpacking ${repo}..."
     if ! unpack "${repo}-${branch}.tar.gz" "${repo}"
     then
       log_error "Unable to unpack ${repo}"
@@ -250,8 +275,14 @@ gnu_download_tool ()
   elif [ -e "${target}.sum" ]
   then
     echo "${target} archive already downloaded."
-    echo "Unpacking ${target}..."
-    if ! unpack `ls ${target}.tar.*`
+    filename=`ls ${target}.tar.*`
+    if ${validate} && ! validate_file "${filename}" `cat ${target}.sum`
+    then
+      log_error "download for ${target} does not match checksum in checksums.txt"
+      return 1
+    fi
+
+    if ! unpack "${filename}"
     then
       log_error "Unable to unpack ${target}"
       return 1
@@ -330,25 +361,17 @@ gnu_download_tool ()
       return 1
     fi
 
-    if ${validate}
+    if ${validate} && ! validate_file "${filename}" "${sha512sum}"
     then
-      echo "Validating ${target}..."
-      checksum=`sha512sum ${filename} | cut -d ' ' -f 1`
-
-      if [ "${checksum}" != "${sha512sum}" ]
-      then
-        print_error "checksum failure: expected ${sha512sum} but got ${checksum}"
-        log_error "download for ${target} does not match checksum in checksums.txt"
-        return 1
-      else
-        echo ${checksum} > ${target}.sum
-        echo "Download validated."
-      fi
+      log_error "download for ${target} does not match checksum in checksums.txt"
+      return 1
+    elif ${validate}
+    then
+      echo ${checksum} > ${target}.sum
     fi
 
     rm -f checksums.txt
 
-    echo "Unpacking ${target}..."
     if ! unpack "${filename}"
     then
       log_error "Unable to unpack ${tool}"
