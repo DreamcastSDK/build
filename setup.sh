@@ -247,7 +247,7 @@ gnu_download_tool ()
   if [ -e "${target}" ]
   then
     echo "${target} already downloaded."
-  elif [ -e `ls ${target}.tar.*` ]
+  elif [ -e "${target}.sum" ]
   then
     echo "${target} archive already downloaded."
     echo "Unpacking ${target}..."
@@ -341,6 +341,7 @@ gnu_download_tool ()
         log_error "download for ${target} does not match checksum in checksums.txt"
         return 1
       else
+        echo ${checksum} > ${target}.sum
         echo "Download validated."
       fi
     fi
@@ -600,11 +601,13 @@ configure_and_make () {
 target_arch="sh-elf"
 configure_and_make "${binutils_dir}"  "--disable-werror --prefix=${installdir} --target=${target_arch}"
 configure_and_make "${gdb_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch}"
-configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch} --without-headers --with-newlib --enable-languages=c --disable-libssp --disable-tls --with-multilib-list=m4-single-only,m4-nofpu,m4 --with-endian=little --with-cpu=m4-single-only"
-configure_and_make "${newlib_dir}"    "--disable-werror --prefix=${installdir} --target=${target_arch} --with-multilib-list=m4-single-only,m4-nofpu,m4 --with-endian=little --with-cpu=m4-single-only"
+#configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch} --without-headers --with-newlib --enable-languages=c --disable-libssp --disable-tls --with-multilib-list=m4-single-only,m4-nofpu,m4 --with-endian=little --with-cpu=m4-single-only"
 configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch} --with-newlib --enable-languages=c,c++,objc,obj-c++ --disable-libssp --disable-tls --with-multilib-list=m4-single-only,m4-nofpu,m4 --with-endian=little --with-cpu=m4-single-only --enable-threads=kos"
+configure_and_make "${newlib_dir}"    "--disable-werror --prefix=${installdir} --target=${target_arch} --with-multilib-list=m4-single-only,m4-nofpu,m4 --with-endian=little --with-cpu=m4-single-only"
+rm -rf ${target_arch}
 
 target_arch="arm-eabi"
 configure_and_make "${binutils_dir}"  "--disable-werror --prefix=${installdir} --target=${target_arch}"
 configure_and_make "${gdb_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch}"
 configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch} --without-headers --with-newlib --enable-languages=c --disable-tls --disable-libssp --with-arch=armv4"
+rm -rf ${target_arch}
