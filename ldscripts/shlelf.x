@@ -1,4 +1,3 @@
-/* Script for -z combreloc: combine and sort reloc sections */
 OUTPUT_FORMAT("elf32-shl", "elf32-shl",
 	      "elf32-shl")
 OUTPUT_ARCH(sh)
