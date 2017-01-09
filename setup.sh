@@ -16,13 +16,11 @@ echo_error () {
   echo "ERROR: $1"
 }
 
-
 # Function to print an error to stdout
 # @param[in] $1 message
 echo_warning () {
   echo "WARNING: $1"
 }
-
 
 # Function to record error to log
 # @param[in] $1 message
@@ -30,18 +28,16 @@ log_error () {
   echo_error "$1" | tee -a ${log}
 }
 
-
 # Function to record warning to log
 # @param[in] $1 message
 log_warning () {
   echo_warning "$1" | tee -a ${log}
 }
 
-
 # Function to detect if a program is usable
 # @param[in] $1 input string e.g. --flagname=value
 # @return "value"
-getvalue () {
+arg_value () {
   echo "${1}" | sed -e "s/--[a-z]*=\(.*\)/\1/"
 }
 
@@ -487,6 +483,7 @@ clone="false"
 git_transport_prefix="https://github.com"
 gnu_url="ftp://gcc.gnu.org/pub"
 
+destdir="/"
 basedir=$(absolutedir `dirname $0`)
 builddir=$(absolutedir "${basedir}/builds")
 installdir="/usr/local"
@@ -508,15 +505,20 @@ until
     ;;
 
     --builddir=*)
-      builddir=$(absolutedir $(getvalue ${opt}))
+      builddir=$(absolutedir $(arg_value ${opt}))
     ;;
 
     --installdir=*)
-      installdir=$(absolutedir $(getvalue ${opt}))
+      installdir=$(absolutedir $(arg_value ${opt}))
+    ;;
+
+# hidden option! only useful for building packages!
+    --destdir=*)
+      destdir=$(absolutedir $(arg_value ${opt}))
     ;;
 
     --makejobs=*)
-      makejobs=$(getvalue ${opt})
+      makejobs=$(arg_value ${opt})
     ;;
 
 
@@ -537,7 +539,6 @@ until
 do
   shift
 done
-
 
 ################################################################################
 #                                                                              #
@@ -616,15 +617,16 @@ configure_and_make () {
   echo "Patching ${wd_dir}..."
   for patchfile in `ls -1 ${basedir}/patches/*.diff | grep "${wd_dir}"`
   do
-    patch --forward -d ${wd_dir} -p1 < ${patchfile} >> ${log} 2>&1
+    patch --forward -d "${wd_dir}" -p1 < ${patchfile} >> ${log} 2>&1
   done
   echo "Configuring ${wd_dir}..."
   mkdir -p ${target_arch}/${wd_dir}
   cd ${target_arch}/${wd_dir}
   sh ${builddir}/${wd_dir}/configure ${conf_flags} >> ${log} 2>&1
   echo "Building ${wd_dir}..."
-  eval "${make_tool} -j${makejobs} >> ${log} 2>&1"
-  eval "sudo ${make_tool} install >> ${log} 2>&1"
+  eval      "${make_tool} DESTDIR=${destdir} -j${makejobs} >> ${log} 2>&1"
+  echo "Installing ${wd_dir}..."
+  eval "sudo ${make_tool} DESTDIR=${destdir} install >> ${log} 2>&1"
   cd ${builddir}
 }
 
@@ -634,7 +636,7 @@ cpu_options="--with-endian=little --with-cpu=m4-single-only"
 
 target_arch="sh-elf"
 configure_and_make "${binutils_dir}"  "--disable-werror --prefix=${installdir} --target=${target_arch}"
-configure_and_make "${gdb_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch}"
+#configure_and_make "${gdb_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch}"
 configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch} ${multilib_options} ${cpu_options} ${library_options} --enable-languages=c --without-headers"
 configure_and_make "${newlib_dir}"    "--disable-werror --prefix=${installdir} --target=${target_arch} ${multilib_options} ${cpu_options}"
 configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch} ${multilib_options} ${cpu_options} ${library_options} --enable-languages=c,c++,objc,obj-c++ --enable-threads=kos"
@@ -642,7 +644,7 @@ rm -rf ${target_arch}
 
 target_arch="arm-eabi"
 configure_and_make "${binutils_dir}"  "--disable-werror --prefix=${installdir} --target=${target_arch}"
-configure_and_make "${gdb_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch}"
+#configure_and_make "${gdb_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch}"
 configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch} ${library_options} --enable-languages=c --without-headers --with-arch=armv4"
 rm -rf ${target_arch}
 
