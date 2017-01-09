@@ -483,7 +483,7 @@ clone="false"
 git_transport_prefix="https://github.com"
 gnu_url="ftp://gcc.gnu.org/pub"
 
-destdir="/"
+packagedir="/"
 basedir=$(absolutedir `dirname $0`)
 builddir=$(absolutedir "${basedir}/builds")
 installdir="/usr/local"
@@ -513,8 +513,8 @@ until
     ;;
 
 # hidden option! only useful for building packages!
-    --destdir=*)
-      destdir=$(absolutedir $(arg_value ${opt}))
+    --packagedir=*)
+      packagedir=$(absolutedir $(arg_value ${opt}))
     ;;
 
     --makejobs=*)
@@ -624,9 +624,9 @@ configure_and_make () {
   cd ${target_arch}/${wd_dir}
   sh ${builddir}/${wd_dir}/configure ${conf_flags} >> ${log} 2>&1
   echo "Building ${wd_dir}..."
-  eval      "${make_tool} DESTDIR=${destdir} -j${makejobs} >> ${log} 2>&1"
+  eval      "${make_tool} packagedir=${packagedir} -j${makejobs} >> ${log} 2>&1"
   echo "Installing ${wd_dir}..."
-  eval "sudo ${make_tool} DESTDIR=${destdir} install >> ${log} 2>&1"
+  eval "sudo ${make_tool} packagedir=${packagedir} install >> ${log} 2>&1"
   cd ${builddir}
 }
 
