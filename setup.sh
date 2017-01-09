@@ -392,6 +392,7 @@ download_components()
 
   for line in `cat ${basedir}/components.conf | grep -v '^#' | grep -v '^$'`
   do
+    echo ""
     case ${line} in
       toolchain:*)
         name=`      echo ${line} | cut -d ':' -f 2`
@@ -488,7 +489,7 @@ gnu_url="ftp://gcc.gnu.org/pub"
 
 basedir=$(absolutedir `dirname $0`)
 builddir=$(absolutedir "${basedir}/builds")
-installdir="/usr"
+installdir="/usr/local"
 
 until
   opt=$1
@@ -572,6 +573,8 @@ echo "Logging to ${log}"
 #                            Download everything                               #
 #                                                                              #
 ################################################################################
+echo ""
+echo "[ Downloading components ]"
 
 # Download all components defined in 'components.conf'
 if ! download_components
@@ -581,7 +584,7 @@ then
   exit 1
 fi
 
-echo "Downloads complete"
+echo "[ Downloads complete! ]"
 
 
 ################################################################################
@@ -589,9 +592,13 @@ echo "Downloads complete"
 #                              Patch and Build                                 #
 #                                                                              #
 ################################################################################
+echo ""
+echo "[ Patching, building, installing ]"
+
+
 assert_dir "Binutils" "${binutils_dir}"
 assert_dir "GCC"      "${gcc_dir}"
-assert_dir "GDB"      "${gdb_dir}"
+#assert_dir "GDB"      "${gdb_dir}"
 assert_dir "Newlib"   "${newlib_dir}"
 assert_dir "GMP"      "${gmp_dir}"
 assert_dir "MPFR"     "${mpfr_dir}"
@@ -605,7 +612,7 @@ ln -s "../${mpc_dir}"  "${gcc_dir}/mpc"  >> ${log} 2>&1
 configure_and_make () {
   wd_dir=${1}
   conf_flags=${2}
-
+  echo ""
   echo "Patching ${wd_dir}..."
   for patchfile in `ls -1 ${basedir}/patches/*.diff | grep "${wd_dir}"`
   do
@@ -617,20 +624,26 @@ configure_and_make () {
   sh ${builddir}/${wd_dir}/configure ${conf_flags} >> ${log} 2>&1
   echo "Building ${wd_dir}..."
   eval "${make_tool} -j${makejobs} >> ${log} 2>&1"
-  eval "${make_tool} install >> ${log} 2>&1"
+  eval "sudo ${make_tool} install >> ${log} 2>&1"
   cd ${builddir}
 }
+
+multilib_options="--with-multilib-list=m4-single-only,m4-nofpu,m4"
+library_options="--with-newlib --disable-libssp --disable-tls"
+cpu_options="--with-endian=little --with-cpu=m4-single-only"
 
 target_arch="sh-elf"
 configure_and_make "${binutils_dir}"  "--disable-werror --prefix=${installdir} --target=${target_arch}"
 configure_and_make "${gdb_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch}"
-#configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch} --without-headers --with-newlib --enable-languages=c --disable-libssp --disable-tls --with-multilib-list=m4-single-only,m4-nofpu,m4 --with-endian=little --with-cpu=m4-single-only"
-configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch} --with-newlib --enable-languages=c,c++,objc,obj-c++ --disable-libssp --disable-tls --with-multilib-list=m4-single-only,m4-nofpu,m4 --with-endian=little --with-cpu=m4-single-only --enable-threads=kos"
-configure_and_make "${newlib_dir}"    "--disable-werror --prefix=${installdir} --target=${target_arch} --with-multilib-list=m4-single-only,m4-nofpu,m4 --with-endian=little --with-cpu=m4-single-only"
+configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch} ${multilib_options} ${cpu_options} ${library_options} --enable-languages=c --without-headers"
+configure_and_make "${newlib_dir}"    "--disable-werror --prefix=${installdir} --target=${target_arch} ${multilib_options} ${cpu_options}"
+configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch} ${multilib_options} ${cpu_options} ${library_options} --enable-languages=c,c++,objc,obj-c++ --enable-threads=kos"
 rm -rf ${target_arch}
 
 target_arch="arm-eabi"
 configure_and_make "${binutils_dir}"  "--disable-werror --prefix=${installdir} --target=${target_arch}"
 configure_and_make "${gdb_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch}"
-configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch} --without-headers --with-newlib --enable-languages=c --disable-tls --disable-libssp --with-arch=armv4"
+configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch} ${library_options} --enable-languages=c --without-headers --with-arch=armv4"
 rm -rf ${target_arch}
+
+echo "[ Installation complete! ]"
