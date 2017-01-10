@@ -10,28 +10,22 @@
 #                                                                              #
 ################################################################################
 
-# Function to print an error to stdout
+# Function to print to stdout and log
 # @param[in] $1 message
-echo_error () {
-  echo "ERROR: $1"
-}
-
-# Function to print an error to stdout
-# @param[in] $1 message
-echo_warning () {
-  echo "WARNING: $1"
+announce () {
+  echo ${1} | tee -a ${log}
 }
 
 # Function to record error to log
 # @param[in] $1 message
 log_error () {
-  echo_error "$1" | tee -a ${log}
+  announce "ERROR: ${1}"
 }
 
 # Function to record warning to log
 # @param[in] $1 message
 log_warning () {
-  echo_warning "$1" | tee -a ${log}
+  announce "WARNING: ${1}"
 }
 
 # Function to detect if a program is usable
@@ -171,7 +165,7 @@ validate_file () {
   if [ "${checksum}" != "${sha512sum}" ]
   then
     echo "INVALID!"
-    print_error "checksum failure: expected ${sha512sum} but got ${checksum}"
+    log_error "checksum failure: expected ${sha512sum} but got ${checksum}"
     return 1
   else
     echo "valid."
@@ -468,7 +462,7 @@ elif ${has_gmake}
 then
   make_tool="gmake"
 else
-  print_error "no make system installed?!"
+  log_error "no make system installed?!"
   exit 1
 fi
 
@@ -552,14 +546,14 @@ if [ ! -e "${builddir}" ]
 then
   if ! mkdir "${builddir}"
   then
-    print_error "Unable to create directory for downloads/clones"
+    log_error "Unable to create directory for downloads/clones"
     exit 1
   fi
 fi
 
 if ! cd "${builddir}"
 then
-  print_error "Unable to change to directory for downloads/clones"
+  log_error "Unable to change to directory for downloads/clones"
   exit 1
 fi
 
@@ -605,47 +599,87 @@ assert_dir "GMP"      "${gmp_dir}"
 assert_dir "MPFR"     "${mpfr_dir}"
 assert_dir "MPC"      "${mpc_dir}"
 
-ln -s "../${gmp_dir}"  "${gcc_dir}/gmp"  >> ${log} 2>&1
-ln -s "../${mpfr_dir}" "${gcc_dir}/mpfr" >> ${log} 2>&1
-ln -s "../${mpc_dir}"  "${gcc_dir}/mpc"  >> ${log} 2>&1
-
-
 configure_and_make () {
   wd_dir=${1}
   conf_flags=${2}
   echo ""
-  echo "Patching ${wd_dir}..."
+  announce "Patching ${wd_dir}..."
   for patchfile in `ls -1 ${basedir}/patches/*.diff | grep "${wd_dir}"`
   do
     patch --forward -d "${wd_dir}" -p1 < ${patchfile} >> ${log} 2>&1
   done
-  echo "Configuring ${wd_dir}..."
-  mkdir -p ${target_arch}/${wd_dir}
-  cd ${target_arch}/${wd_dir}
+  announce "Configuring ${program_prefix} ${wd_dir}..."
+  mkdir -p ${program_prefix}/${wd_dir}
+  cd ${program_prefix}/${wd_dir}
   sh ${builddir}/${wd_dir}/configure ${conf_flags} >> ${log} 2>&1
-  echo "Building ${wd_dir}..."
-  eval      "${make_tool} packagedir=${packagedir} -j${makejobs} >> ${log} 2>&1"
-  echo "Installing ${wd_dir}..."
-  eval "sudo ${make_tool} packagedir=${packagedir} install >> ${log} 2>&1"
+  announce "Building ${program_prefix} ${wd_dir}..."
+  eval      "${make_tool} DESTDIR=${packagedir} -j${makejobs} >> ${log} 2>&1"
+  announce "Installing ${program_prefix} ${wd_dir}..."
+  eval "sudo ${make_tool} DESTDIR=${packagedir} install >> ${log} 2>&1"
   cd ${builddir}
 }
 
 multilib_options="--with-multilib-list=m4-single-only,m4-nofpu,m4"
 library_options="--with-newlib --disable-libssp --disable-tls"
+extra_gcc_options="--with-gmp=${gmp_dir} --with-mpfr=${mpfr_dir} --with-mpc=${mpc_dir}"
 cpu_options="--with-endian=little --with-cpu=m4-single-only"
 
-target_arch="sh-elf"
-configure_and_make "${binutils_dir}"  "--disable-werror --prefix=${installdir} --target=${target_arch}"
-#configure_and_make "${gdb_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch}"
-configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch} ${multilib_options} ${cpu_options} ${library_options} --enable-languages=c --without-headers"
-configure_and_make "${newlib_dir}"    "--disable-werror --prefix=${installdir} --target=${target_arch} ${multilib_options} ${cpu_options}"
-configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch} ${multilib_options} ${cpu_options} ${library_options} --enable-languages=c,c++,objc,obj-c++ --enable-threads=kos"
-rm -rf ${target_arch}
+program_prefix="sh4-dc"
+configure_and_make "${binutils_dir}"  "--disable-werror --prefix=${installdir} --target=sh-elf --program-prefix=${program_prefix}"
+#configure_and_make "${gdb_dir}"       "--disable-werror --prefix=${installdir} --target=sh-elf --program-prefix=${program_prefix}"
+configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=sh-elf --program-prefix=${program_prefix} ${multilib_options} ${cpu_options} ${library_options} ${extra_gcc_options} --enable-languages=c --without-headers"
+configure_and_make "${newlib_dir}"    "--disable-werror --prefix=${installdir} --target=sh-elf --program-prefix=${program_prefix} ${multilib_options} ${cpu_options}"
+configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=sh-elf --program-prefix=${program_prefix} ${multilib_options} ${cpu_options} ${library_options} ${extra_gcc_options} --enable-languages=c,c++,objc,obj-c++ --enable-threads=kos"
+#rm -rf ${program_prefix}
 
-target_arch="arm-eabi"
-configure_and_make "${binutils_dir}"  "--disable-werror --prefix=${installdir} --target=${target_arch}"
-#configure_and_make "${gdb_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch}"
-configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=${target_arch} ${library_options} --enable-languages=c --without-headers --with-arch=armv4"
-rm -rf ${target_arch}
+program_prefix="arm-dc"
+configure_and_make "${binutils_dir}"  "--disable-werror --prefix=${installdir} --target=arm-eabi --program-prefix=${program_prefix}"
+#configure_and_make "${gdb_dir}"       "--disable-werror --prefix=${installdir} --target=arm-eabi --program-prefix=${program_prefix}"
+configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=arm-eabi --program-prefix=${program_prefix} ${library_options} --enable-languages=c --without-headers --with-arch=armv4"
+#rm -rf ${program_prefix}
 
 echo "[ Installation complete! ]"
+
+exit 0
+
+=== GCC options ===
+#required
+-ml
+-m4-single-only
+
+#optimizations
+-ffunction-sections
+-fdata-sections
+
+#linker flags
+-Wl,-Ttext=0x8c010000
+-Wl,--gc-sections
+
+
+#experimental linker flags
+-Wl,--gc-sections
+-Wl,--entry=0x8c010000
+-Wl,--section-start=text=0x8c010000
+-Wl,--section-start=ocram=0x7c001000
+-Wl,--section-start=stack=0x8c010000
+
+
+
+file: sh.opt
+
+msaturn
+Target RejectNegative Mask(SEGA_SATURN)
+Generate Sega Saturn compatible code
+
+mdreamcast
+Target RejectNegative Mask(SEGA_DREAMCAST)
+Generate Sega Dreamcast compatible code
+
+file: sh.h
+
+if(TARGET_SEGA_DREAMCAST) { \
+  builtin_define ("__SH4__"); \
+  builtin_define ("__LITTLE_ENDIAN__"); \
+  builtin_define ("__SH4_SINGLE_ONLY__"); \
+  break; \
+} \
