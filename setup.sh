@@ -619,23 +619,41 @@ configure_and_make () {
   cd ${builddir}
 }
 
+set_arch() {
+  case ${1} in
+  sh-dreamcast)
+    program_prefix="sh-dreamcast"
+    target="sh-elf"
+  ;;
+  arm-dreamcast)
+    program_prefix="arm-dreamcast"
+    target="arm-eabi"
+  ;;
+  *)
+    log_error "unknown architecture"
+    exit 1
+  ;;
+  esac
+  base_options="--disable-werror --prefix=${installdir} --target=${target} --program-prefix=${program_prefix}-"
+}
+
 multilib_options="--with-multilib-list=m4-single-only,m4-nofpu,m4"
 library_options="--with-newlib --disable-libssp --disable-tls"
 extra_gcc_options="--with-gmp=${gmp_dir} --with-mpfr=${mpfr_dir} --with-mpc=${mpc_dir}"
 cpu_options="--with-endian=little --with-cpu=m4-single-only"
 
-program_prefix="sh-dreamcast"
-configure_and_make "${binutils_dir}"  "--disable-werror --prefix=${installdir} --target=sh-elf --program-prefix=${program_prefix}-"
-#configure_and_make "${gdb_dir}"       "--disable-werror --prefix=${installdir} --target=sh-elf --program-prefix=${program_prefix}"
-configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=sh-elf --program-prefix=${program_prefix}- ${multilib_options} ${cpu_options} ${library_options} ${extra_gcc_options} --enable-languages=c --without-headers"
-configure_and_make "${newlib_dir}"    "--disable-werror --prefix=${installdir} --target=sh-elf --program-prefix=${program_prefix}- ${multilib_options} ${cpu_options}"
-configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=sh-elf --program-prefix=${program_prefix}- ${multilib_options} ${cpu_options} ${library_options} ${extra_gcc_options} --enable-languages=c,c++,objc,obj-c++ --enable-threads=kos"
+set_arch "sh-dreamcast"
+configure_and_make "${binutils_dir}"  "${base_options}"
+#configure_and_make "${gdb_dir}"       "${base_options}"
+configure_and_make "${gcc_dir}"       "${base_options} ${multilib_options} ${cpu_options} ${library_options} ${extra_gcc_options} --enable-languages=c --without-headers"
+configure_and_make "${newlib_dir}"    "${base_options} ${multilib_options} ${cpu_options}"
+configure_and_make "${gcc_dir}"       "${base_options} ${multilib_options} ${cpu_options} ${library_options} ${extra_gcc_options} --enable-languages=c,c++,objc,obj-c++ --enable-threads=kos"
 #rm -rf ${program_prefix}
 
-program_prefix="arm-dreamcast"
-configure_and_make "${binutils_dir}"  "--disable-werror --prefix=${installdir} --target=arm-eabi --program-prefix=${program_prefix}-"
-#configure_and_make "${gdb_dir}"       "--disable-werror --prefix=${installdir} --target=arm-eabi --program-prefix=${program_prefix}"
-configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=arm-eabi --program-prefix=${program_prefix}- ${library_options} --enable-languages=c --without-headers --with-arch=armv4"
+set_arch "arm-dreamcast"
+configure_and_make "${binutils_dir}"  "${base_options}"
+#configure_and_make "${gdb_dir}"       "${base_options}"
+configure_and_make "${gcc_dir}"       "${base_options} ${library_options} --enable-languages=c --without-headers --with-arch=armv4"
 #rm -rf ${program_prefix}
 
 echo "[ Installation complete! ]"
