@@ -1,0 +1,163 @@
+*asm:
+%(subtarget_asm_endian_spec) %{mrelax:-relax %(subtarget_asm_relax_spec)}%(subtarget_asm_isa_spec) %(subtarget_asm_spec)%{m2a:--isa=sh2a} %{m2a-single:--isa=sh2a} %{m2a-single-only:--isa=sh2a} %{m2a-nofpu:--isa=sh2a-nofpu} %{m5-compact*:--isa=SHcompact} %{m5-32media*:--isa=SHmedia --abi=32} %{m5-64media*:--isa=SHmedia --abi=64} %{m4al:-dsp} %{mcut2-workaround:-cut2-workaround}
+
+*asm_debug:
+
+
+*asm_final:
+
+
+*asm_options:
+%{-target-help:%:print-asm-header()} %a %Y %{c:%W{o*}%{!o*:-o %w%b%O}}%{!c:-o %d%w%u%O}
+
+*invoke_as:
+%{!fwpa:   %{fcompare-debug=*|fdump-final-insns=*:%:compare-debug-dump-opt()}   %{!S:-o %|.s |
+ as %(asm_options) %m.s %A }  }
+
+*cpp:
+ %(subtarget_cpp_spec) 
+
+*cpp_options:
+%(cpp_unique_options) %1 %{m*} %{std*&ansi&trigraphs} %{W*&pedantic*} %{w} %{f*} %{g*:%{!g0:%{g*} %{!fno-working-directory:-fworking-directory}}} %{O*} %{undef} %{save-temps*:-fpch-preprocess}
+
+*cpp_debug_options:
+%{d*}
+
+*cpp_unique_options:
+%{!Q:-quiet} %{nostdinc*} %{C} %{CC} %{v} %{I*&F*} %{P} %I %{MD:-MD %{!o:%b.d}%{o*:%.d%*}} %{MMD:-MMD %{!o:%b.d}%{o*:%.d%*}} %{M} %{MM} %{MF*} %{MG} %{MP} %{MQ*} %{MT*} %{!E:%{!M:%{!MM:%{!MT:%{!MQ:%{MD|MMD:%{o*:-MQ %*}}}}}}} %{remap} %{g3|ggdb3|gstabs3|gcoff3|gxcoff3|gvms3:-dD} %{!iplugindir*:%{fplugin*:%:find-plugindir()}} %{H} %C %{D*&U*&A*} %{i*} %Z %i %{fmudflap:-D_MUDFLAP -include mf-runtime.h} %{fmudflapth:-D_MUDFLAP -D_MUDFLAPTH -include mf-runtime.h} %{E|M|MM:%W{o*}}
+
+*trad_capable_cpp:
+cc1 -E %{traditional|traditional-cpp:-traditional-cpp}
+
+*cc1:
+
+
+*cc1_options:
+%{pg:%{fomit-frame-pointer:%e-pg and -fomit-frame-pointer are incompatible}} %{!iplugindir*:%{fplugin*:%:find-plugindir()}} %1 %{!Q:-quiet} %{!dumpbase:-dumpbase %B} %{d*} %{m*} %{aux-info*} %{fcompare-debug-second:%:compare-debug-auxbase-opt(%b)}  %{!fcompare-debug-second:%{c|S:%{o*:-auxbase-strip %*}%{!o*:-auxbase %b}}}%{!c:%{!S:-auxbase %b}}  %{g*} %{O*} %{W*&pedantic*} %{w} %{std*&ansi&trigraphs} %{v:-version} %{pg:-p} %{p} %{f*} %{undef} %{Qn:-fno-ident} %{Qy:} %{-help:--help} %{-target-help:--target-help} %{-version:--version} %{-help=*:--help=%*} %{!fsyntax-only:%{S:%W{o*}%{!o*:-o %b.s}}} %{fsyntax-only:-o %j} %{-param*} %{fmudflap|fmudflapth:-fno-builtin -fno-merge-constants} %{coverage:-fprofile-arcs -ftest-coverage}
+
+*cc1plus:
+
+
+*link_gcc_c_sequence:
+%G %L %G
+
+*link_ssp:
+%{fstack-protector|fstack-protector-all:-lssp_nonshared -lssp}
+
+*endfile:
+%{!shared:crtend.o%s} %{shared:crtendS.o%s} crtn.o%s
+
+*link:
+-m %(link_emul_prefix)%{m5-compact*|m5-32media*:32}%{m5-64media*:64}%{!m1:%{!m2:%{!m3*:%{!m4*:%{!m5*:%(link_default_cpu_emul)}}}}}%(subtarget_link_emul_suffix) %{mrelax:-relax} %(subtarget_link_spec)
+
+*lib:
+-lc
+
+*mfwrap:
+ %{static: %{fmudflap|fmudflapth:  --wrap=malloc --wrap=free --wrap=calloc --wrap=realloc --wrap=mmap --wrap=mmap64 --wrap=munmap --wrap=alloca} %{fmudflapth: --wrap=pthread_create}} %{fmudflap|fmudflapth: --wrap=main}
+
+*mflib:
+%{fmudflap|fmudflapth: -export-dynamic}
+
+*link_gomp:
+
+
+*libgcc:
+%{!shared:   %{m4-100*:-lic_invalidate_array_4-100}   %{m4-200*:-lic_invalidate_array_4-200}   %{m4-300*|m4-340:-lic_invalidate_array_4a %{!Os: -lgcc-4-300}}   %{m4a*:-lic_invalidate_array_4a}}   %{Os: -lgcc-Os-4-200}   -lgcc   %{!Os: -lgcc-Os-4-200}
+
+*startfile:
+%{!shared: crt1.o%s} crti.o%s    %{!shared:crtbegin.o%s} %{shared:crtbeginS.o%s}
+
+*cross_compile:
+1
+
+*version:
+4.7.3
+
+*multilib:
+. !m4-single-only !m4-nofpu !m4;m4-single-only m4-single-only !m4-nofpu !m4;m4-nofpu !m4-single-only m4-nofpu !m4;m4 !m4-single-only !m4-nofpu m4;
+
+*multilib_defaults:
+ml m4-single-only
+
+*multilib_extra:
+
+
+*multilib_matches:
+m4-single-only m4-single-only;m4-nofpu m4-nofpu;m4 m4;
+
+*multilib_exclusions:
+
+
+*multilib_options:
+m4-single-only/m4-nofpu/m4
+
+*linker:
+collect2
+
+*linker_plugin_file:
+
+
+*lto_wrapper:
+
+
+*lto_gcc:
+
+
+*link_libgcc:
+%D
+
+*md_exec_prefix:
+
+
+*md_startfile_prefix:
+
+
+*md_startfile_prefix_1:
+
+
+*startfile_prefix_spec:
+
+
+*sysroot_spec:
+--sysroot=%R
+
+*sysroot_suffix_spec:
+%{m4-single-only:/m4-single-only;m4-nofpu:/m4-nofpu;m4:/m4;:}
+
+*sysroot_hdrs_suffix_spec:
+
+
+*self_spec:
+
+
+*subtarget_cpp_spec:
+
+
+*link_emul_prefix:
+sh%{!mb:l}elf
+
+*link_default_cpu_emul:
+
+
+*subtarget_link_emul_suffix:
+
+
+*subtarget_link_spec:
+
+
+*subtarget_asm_endian_spec:
+%{mb:-big} %{!mb:-little}
+
+*subtarget_asm_relax_spec:
+%{!m1:%{!m2:%{!m3*:%{!m5*:-isa=sh4-up}}}}
+
+*subtarget_asm_isa_spec:
+
+
+*subtarget_asm_spec:
+
+
+*link_command:
+%{!fsyntax-only:%{!c:%{!M:%{!MM:%{!E:%{!S:    %(linker) %{!fno-use-linker-plugin:%{flto|flto=*|fuse-linker-plugin:     -plugin %(linker_plugin_file)     -plugin-opt=%(lto_wrapper)     -plugin-opt=-fresolution=%u.res     %{!nostdlib:%{!nodefaultlibs:%:pass-through-libs(%(link_gcc_c_sequence))}}     }}%{flto|flto=*:%<fcompare-debug*}     %{flto} %{flto=*} %l %{pie:-pie} %X %{o*} %{e*} %{N} %{n} %{r}    %{s} %{t} %{u*} %{z} %{Z} %{!nostdlib:%{!nostartfiles:%S}}    %{static:} %{L*} %(mfwrap) %(link_libgcc) %o    %{fopenmp|ftree-parallelize-loops=*:%:include(libgomp.spec)%(link_gomp)}    %{fgnu-tm:%:include(libitm.spec)%(link_itm)}    %(mflib)  %{fsplit-stack: --wrap=pthread_create}    %{fprofile-arcs|fprofile-generate*|coverage:-lgcov}    %{!nostdlib:%{!nodefaultlibs:%(link_ssp) %(link_gcc_c_sequence)}}    %{!nostdlib:%{!nostartfiles:%E}} %{T*} }}}}}}
+
