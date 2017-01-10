@@ -344,7 +344,7 @@ gnu_download_tool ()
       esac
     done
 
-    echo "Downloading ${target}..."
+    announce "Downloading ${target}..."
     if ! download "${directory}/${filename}" "${filename}"
     then
       log_error "Unable to download ${tool}"
@@ -368,6 +368,13 @@ gnu_download_tool ()
       return 1
     fi
   fi
+
+  announce "Applying patches..."
+  for patchfile in `ls -1 ${basedir}/patches/*.diff | grep "${target}"`
+  do
+    patch --batch --forward --directory=${target} --strip=1 < ${patchfile} >> ${log} 2>&1
+  done
+  [ "true" ]
 }
 
 
@@ -438,7 +445,7 @@ download_components()
 
 ################################################################################
 #                                                                              #
-#                              Detect programs                                 #
+#                               Detect programs                                #
 #                                                                              #
 ################################################################################
 
@@ -468,7 +475,7 @@ fi
 
 ################################################################################
 #                                                                              #
-#                              Parse arguments                                 #
+#                               Parse arguments                                #
 #                                                                              #
 ################################################################################
 # Defaults
@@ -536,7 +543,7 @@ done
 
 ################################################################################
 #                                                                              #
-#                              Initialize setup                                #
+#                               Initialize setup                               #
 #                                                                              #
 ################################################################################
 
@@ -565,11 +572,10 @@ echo "Logging to ${log}"
 
 ################################################################################
 #                                                                              #
-#                            Download everything                               #
+#                             Download everything                              #
 #                                                                              #
 ################################################################################
-echo ""
-echo "[ Downloading components ]"
+echo "\n======= [ Downloading components ] ======="
 
 # Download all components defined in 'components.conf'
 if ! download_components
@@ -579,17 +585,15 @@ then
   exit 1
 fi
 
-echo "[ Downloads complete! ]"
+echo "\n======= [ Downloads complete! ] ======="
 
 
 ################################################################################
 #                                                                              #
-#                              Patch and Build                                 #
+#                          Configure, build, install                           #
 #                                                                              #
 ################################################################################
-echo ""
-echo "[ Patching, building, installing ]"
-
+echo "\n======= [ Configuring, building, installing ] ======="
 
 assert_dir "Binutils" "${binutils_dir}"
 assert_dir "GCC"      "${gcc_dir}"
@@ -609,19 +613,13 @@ configure_and_make () {
   program_prefix="`echo ${arch} | cut -d '-' -f 1`-dreamcast"
   conf_flags="--disable-werror --prefix=${installdir} --target=${arch} --program-prefix=${program_prefix}- ${3}"
 
-  echo ""
-  announce "Patching ${wd_dir}..."
-  for patchfile in `ls -1 ${basedir}/patches/*.diff | grep "${wd_dir}"`
-  do
-    patch --forward -d "${wd_dir}" -p1 < ${patchfile} >> ${log} 2>&1
-  done
-  announce "Configuring ${program_prefix}-${wd_dir}..."
+  announce "\n[ ${program_prefix}-${wd_dir} ]\nConfiguring..."
   mkdir -p ${program_prefix}/${wd_dir}
   cd ${program_prefix}/${wd_dir}
   sh ${builddir}/${wd_dir}/configure ${conf_flags} >> ${log} 2>&1
-  announce "Building ${program_prefix}-${wd_dir}..."
+  announce "Building..."
   eval      "${make_tool} DESTDIR=${packagedir} -j${makejobs} >> ${log} 2>&1"
-  announce "Installing ${program_prefix}-${wd_dir}..."
+  announce "Installing..."
   eval "sudo ${make_tool} DESTDIR=${packagedir} install >> ${log} 2>&1"
   cd ${builddir}
 }
@@ -629,6 +627,7 @@ configure_and_make () {
 multilib_options="--with-multilib-list=m4-single-only,m4-nofpu,m4"
 library_options="--with-newlib --disable-libssp --disable-tls"
 #extra_gcc_options="--with-gmp=${builddir}/${gmp_dir} --with-mpfr=${builddir}/${mpfr_dir} --with-mpc=${builddir}/${mpc_dir}"
+extra_gcc_options="--with-specs=${basedir}/sh-dreamcast.specs"
 cpu_options="--with-endian=little --with-cpu=m4-single-only"
 
 configure_and_make "${binutils_dir}"  "sh-elf"
@@ -641,7 +640,7 @@ configure_and_make "${binutils_dir}"  "arm-eabi"
 #configure_and_make "${gdb_dir}"       "arm-eabi"
 configure_and_make "${gcc_dir}"       "arm-eabi" "${library_options} --enable-languages=c --without-headers --with-arch=armv4"
 
-echo "[ Installation complete! ]"
+echo "\n======= [ Installation complete! ] ======="
 
 exit 0
 
