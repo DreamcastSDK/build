@@ -599,6 +599,10 @@ assert_dir "GMP"      "${gmp_dir}"
 assert_dir "MPFR"     "${mpfr_dir}"
 assert_dir "MPC"      "${mpc_dir}"
 
+ln -s "${builddir}/${gmp_dir}"  "${gcc_dir}/gmp"  >> ${log} 2>&1
+ln -s "${builddir}/${mpfr_dir}" "${gcc_dir}/mpfr" >> ${log} 2>&1
+ln -s "${builddir}/${mpc_dir}"  "${gcc_dir}/mpc"  >> ${log} 2>&1
+
 configure_and_make () {
   wd_dir=${1}
   arch=${2}
@@ -624,7 +628,7 @@ configure_and_make () {
 
 multilib_options="--with-multilib-list=m4-single-only,m4-nofpu,m4"
 library_options="--with-newlib --disable-libssp --disable-tls"
-extra_gcc_options="--with-gmp=${gmp_dir} --with-mpfr=${mpfr_dir} --with-mpc=${mpc_dir}"
+#extra_gcc_options="--with-gmp=${builddir}/${gmp_dir} --with-mpfr=${builddir}/${mpfr_dir} --with-mpc=${builddir}/${mpc_dir}"
 cpu_options="--with-endian=little --with-cpu=m4-single-only"
 
 configure_and_make "${binutils_dir}"  "sh-elf"
