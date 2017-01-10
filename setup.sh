@@ -603,7 +603,7 @@ configure_and_make () {
   wd_dir=${1}
   arch=${2}
   program_prefix="`echo ${arch} | cut -d '-' -f 1`-dreamcast"
-  conf_flags="--disable-werror --prefix=${installdir} --target=${arch} --program-prefix=${program_prefix} ${3}"
+  conf_flags="--disable-werror --prefix=${installdir} --target=${arch} --program-prefix=${program_prefix}- ${3}"
 
   echo ""
   announce "Patching ${wd_dir}..."
