@@ -608,13 +608,13 @@ configure_and_make () {
   do
     patch --forward -d "${wd_dir}" -p1 < ${patchfile} >> ${log} 2>&1
   done
-  announce "Configuring ${program_prefix} ${wd_dir}..."
+  announce "Configuring ${program_prefix}-${wd_dir}..."
   mkdir -p ${program_prefix}/${wd_dir}
   cd ${program_prefix}/${wd_dir}
   sh ${builddir}/${wd_dir}/configure ${conf_flags} >> ${log} 2>&1
-  announce "Building ${program_prefix} ${wd_dir}..."
+  announce "Building ${program_prefix}-${wd_dir}..."
   eval      "${make_tool} DESTDIR=${packagedir} -j${makejobs} >> ${log} 2>&1"
-  announce "Installing ${program_prefix} ${wd_dir}..."
+  announce "Installing ${program_prefix}-${wd_dir}..."
   eval "sudo ${make_tool} DESTDIR=${packagedir} install >> ${log} 2>&1"
   cd ${builddir}
 }
@@ -624,18 +624,18 @@ library_options="--with-newlib --disable-libssp --disable-tls"
 extra_gcc_options="--with-gmp=${gmp_dir} --with-mpfr=${mpfr_dir} --with-mpc=${mpc_dir}"
 cpu_options="--with-endian=little --with-cpu=m4-single-only"
 
-program_prefix="sh4-dc"
-configure_and_make "${binutils_dir}"  "--disable-werror --prefix=${installdir} --target=sh-elf --program-prefix=${program_prefix}"
+program_prefix="sh-dreamcast"
+configure_and_make "${binutils_dir}"  "--disable-werror --prefix=${installdir} --target=sh-elf --program-prefix=${program_prefix}-"
 #configure_and_make "${gdb_dir}"       "--disable-werror --prefix=${installdir} --target=sh-elf --program-prefix=${program_prefix}"
-configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=sh-elf --program-prefix=${program_prefix} ${multilib_options} ${cpu_options} ${library_options} ${extra_gcc_options} --enable-languages=c --without-headers"
-configure_and_make "${newlib_dir}"    "--disable-werror --prefix=${installdir} --target=sh-elf --program-prefix=${program_prefix} ${multilib_options} ${cpu_options}"
-configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=sh-elf --program-prefix=${program_prefix} ${multilib_options} ${cpu_options} ${library_options} ${extra_gcc_options} --enable-languages=c,c++,objc,obj-c++ --enable-threads=kos"
+configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=sh-elf --program-prefix=${program_prefix}- ${multilib_options} ${cpu_options} ${library_options} ${extra_gcc_options} --enable-languages=c --without-headers"
+configure_and_make "${newlib_dir}"    "--disable-werror --prefix=${installdir} --target=sh-elf --program-prefix=${program_prefix}- ${multilib_options} ${cpu_options}"
+configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=sh-elf --program-prefix=${program_prefix}- ${multilib_options} ${cpu_options} ${library_options} ${extra_gcc_options} --enable-languages=c,c++,objc,obj-c++ --enable-threads=kos"
 #rm -rf ${program_prefix}
 
-program_prefix="arm-dc"
-configure_and_make "${binutils_dir}"  "--disable-werror --prefix=${installdir} --target=arm-eabi --program-prefix=${program_prefix}"
+program_prefix="arm-dreamcast"
+configure_and_make "${binutils_dir}"  "--disable-werror --prefix=${installdir} --target=arm-eabi --program-prefix=${program_prefix}-"
 #configure_and_make "${gdb_dir}"       "--disable-werror --prefix=${installdir} --target=arm-eabi --program-prefix=${program_prefix}"
-configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=arm-eabi --program-prefix=${program_prefix} ${library_options} --enable-languages=c --without-headers --with-arch=armv4"
+configure_and_make "${gcc_dir}"       "--disable-werror --prefix=${installdir} --target=arm-eabi --program-prefix=${program_prefix}- ${library_options} --enable-languages=c --without-headers --with-arch=armv4"
 #rm -rf ${program_prefix}
 
 echo "[ Installation complete! ]"
