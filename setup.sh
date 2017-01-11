@@ -547,7 +547,7 @@ done
 #                                                                              #
 ################################################################################
 
-# Create and then move to builddir location
+# Create and then move into builddir location
 
 if [ ! -e "${builddir}" ]
 then
@@ -568,7 +568,7 @@ fi
 log="${builddir}/build-$(date +%F-%H%M).log"
 rm -f "${log}"
 
-echo "Logging to ${log}"
+echo "\nLogging to ${log}"
 
 ################################################################################
 #                                                                              #
@@ -603,6 +603,7 @@ assert_dir "GMP"      "${gmp_dir}"
 assert_dir "MPFR"     "${mpfr_dir}"
 assert_dir "MPC"      "${mpc_dir}"
 
+# make symlinks for GCC... at least until I figure out the flags to specify their locations
 ln -s "${builddir}/${gmp_dir}"  "${gcc_dir}/gmp"  >> ${log} 2>&1
 ln -s "${builddir}/${mpfr_dir}" "${gcc_dir}/mpfr" >> ${log} 2>&1
 ln -s "${builddir}/${mpc_dir}"  "${gcc_dir}/mpc"  >> ${log} 2>&1
@@ -613,7 +614,8 @@ configure_and_make () {
   program_prefix="`echo ${arch} | cut -d '-' -f 1`-dreamcast"
   conf_flags="--disable-werror --prefix=${installdir} --target=${arch} --program-prefix=${program_prefix}- ${3}"
 
-  announce "\n[ ${program_prefix}-${wd_dir} ]\nConfiguring..."
+  announce "\n[ ${program_prefix}-${wd_dir} ]"
+  announce "Configuring..."
   mkdir -p ${program_prefix}/${wd_dir}
   cd ${program_prefix}/${wd_dir}
   sh ${builddir}/${wd_dir}/configure ${conf_flags} >> ${log} 2>&1
@@ -626,9 +628,10 @@ configure_and_make () {
 
 multilib_options="--with-multilib-list=m4-single-only,m4-nofpu,m4"
 library_options="--with-newlib --disable-libssp --disable-tls"
-#extra_gcc_options="--with-gmp=${builddir}/${gmp_dir} --with-mpfr=${builddir}/${mpfr_dir} --with-mpc=${builddir}/${mpc_dir}"
-extra_gcc_options="--with-specs=${basedir}/sh-dreamcast.specs"
 cpu_options="--with-endian=little --with-cpu=m4-single-only"
+#extra_gcc_options="--with-gmp=${builddir}/${gmp_dir} --with-mpfr=${builddir}/${mpfr_dir} --with-mpc=${builddir}/${mpc_dir}"
+#extra_gcc_options="--with-specs=\"%{shared:-Wl,-rpath -Wl,/specdemo}%{!shared:-Wl,-rpath -Wl,/specdemo}\""
+#echo extra options: ${extra_gcc_options}
 
 configure_and_make "${binutils_dir}"  "sh-elf"
 #configure_and_make "${gdb_dir}"       "sh-elf"
