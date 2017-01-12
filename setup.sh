@@ -637,7 +637,6 @@ target_name () {
 }
 
 configure_and_make () {
-return 0
   wd_dir=${1}
   target=${2}
   new_target=$(target_name ${target})
@@ -645,7 +644,6 @@ return 0
              --exec-prefix=${installdir}/dreamcast
              --bindir=${installdir}/bin
              --disable-werror --target=${target} --program-prefix=${new_target}- ${3}"
-#  conf_flags="${conf_flags}  --libdir=${installdir}/lib --libexecdir=${installdir}/libexec --with-slibdir=${installdir}/slib"
 
   cd ${builddir}
   announce "\n[ ${new_target}-${wd_dir} ]"
