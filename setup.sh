@@ -86,6 +86,8 @@ detect () {
 # @return the result of the underlying call or 1 if no utility is found
 has_wget=$(detect "wget")
 has_curl=$(detect "curl")
+has_fetch=$(detect "fetch")
+has_aria2c=$(detect "aria2c")
 download ()
 {
   url=$1
@@ -96,20 +98,40 @@ download ()
   then
     case ${options} in
       silent)
-        wget --quiet --continue --output-document="${outfile}" ${url}
+        wget -q -c -O "${outfile}" "${url}"
       ;;
       *)
-        wget --quiet --show-progress --progress=bar:force:noscroll --continue --output-document="${outfile}" ${url}
+        wget --show-progress --progress=bar:force:noscroll -q -c -O "${outfile}" "${url}"
       ;;
     esac
   elif ${has_curl}
   then
     case ${options} in
       silent)
-        curl -C - --silent --url "${url}" --output "${outfile}"
+        curl -s -C - -o "${outfile}" "${url}"
       ;;
       *)
-        curl -C - --progress-bar --url "${url}" --output "${outfile}"
+        curl -# -C - -o "${outfile}" "${url}"
+      ;;
+    esac
+  elif ${has_fetch}
+    then
+    case ${options} in
+      silent)
+        fetch -q -m -a -o "${outfile}" "${url}"
+      ;;
+      *)
+        fetch -m -a -o "${outfile}" "${url}"
+      ;;
+    esac
+  elif ${has_aria2c}
+    then
+    case ${options} in
+      silent)
+        aria2c -q -c -o "${outfile}" "${url}"
+      ;;
+      *)
+        aria2c -c -o "${outfile}" "${url}"
       ;;
     esac
   else
@@ -262,118 +284,120 @@ gnu_download_tool ()
   if [ -e "${target}" ]
   then
     echo "${target} already downloaded."
-  elif [ -e "${target}.sum" ]
-  then
-    echo "${target} archive already downloaded."
-    filename=`ls ${target}.tar.*`
-    if ${validate} && ! validate_file "${filename}" `cat ${target}.sum`
-    then
-      log_error "download for ${target} does not match checksum in checksums.txt"
-      return 1
-    fi
-
-    if ! unpack "${filename}"
-    then
-      log_error "Unable to unpack ${target}"
-      return 1
-    fi
   else
-    echo -n "Locating ${target}.."
-# check the locations it /might/ be
-    for directory in \
-        "${urlbase}/${tool}" \
-        "${urlbase}/${tool}/releases" \
-        "${urlbase}/${tool}/releases/${target}" \
-        "${urlbase}/${tool}/${version}" \
-        "${urlbase}/${tool}/snapshots" \
-        "${urlbase}/${tool}/snapshots/${target}" \
-        "${urlbase}/gcc/infrastructure" \
-        "error"
-    do
-      echo -n "."
-      if [ ${directory} = "error" ]
+    if [ -e "${target}.sum" ]
+    then
+      echo "${target} archive already downloaded."
+      filename=`ls ${target}.tar.*`
+      if ${validate} && ! validate_file "${filename}" `cat ${target}.sum`
       then
-        echo ""
-        log_error "Unable to locate ${target} on server"
+        log_error "download for ${target} does not match checksum in checksums.txt"
         return 1
       fi
-      rm -f checksums.txt
-      touch checksums.txt
-      if download "${directory}/sha512.sum" "checksums.txt" "silent"
+
+      if ! unpack "${filename}"
       then
-        output=`grep "${target}.tar" checksums.txt`
-        if [ "${output}" != "" ]
-        then
-          echo " found."
-          break
-        fi
+        log_error "Unable to unpack ${target}"
+        return 1
       fi
-    done
-
-    for line in `grep "${target}.tar" checksums.txt | sed -e "s/\([0-9a-f]\{128\}\)  .*.tar.\([a-z]\{2,3\}\)/\1:\2/"`
-    do
-      this_sha512sum=`echo ${line} | cut -d ':' -f 1`
-
-      case `echo ${line} | cut -d ':' -f 2` in
-        gz)
-          if [ "${filename}" = "" ] && ${has_gzip}
-          then
-            sha512sum=${this_sha512sum}
-            filename=${target}.tar.gz
-          fi
-        ;;
-        bz2)
-        if ${has_bzip2}
+    else
+      echo -n "Locating ${target}.."
+  # check the locations it /might/ be
+      for directory in \
+          "${urlbase}/${tool}" \
+          "${urlbase}/${tool}/releases" \
+          "${urlbase}/${tool}/releases/${target}" \
+          "${urlbase}/${tool}/${version}" \
+          "${urlbase}/${tool}/snapshots" \
+          "${urlbase}/${tool}/snapshots/${target}" \
+          "${urlbase}/gcc/infrastructure" \
+          "error"
+      do
+        echo -n "."
+        if [ ${directory} = "error" ]
         then
-          sha512sum=${this_sha512sum}
-          filename=${target}.tar.bz2
-          fi
-        ;;
-        xz)
-          if ${has_xz}
+          echo ""
+          log_error "Unable to locate ${target} on server"
+          return 1
+        fi
+        rm -f checksums.txt
+        touch checksums.txt
+        if download "${directory}/sha512.sum" "checksums.txt" "silent"
+        then
+          output=`grep "${target}.tar" checksums.txt`
+          if [ "${output}" != "" ]
           then
-            sha512sum=${this_sha512sum}
-            filename=${target}.tar.xz
+            echo " found."
             break
           fi
-        ;;
-        *)
-          log_error "parsing checksums.txt for ${target} from ${directory}"
-          return 1
-        ;;
-      esac
+        fi
+      done
+
+      for line in `grep "${target}.tar" checksums.txt | sed -e "s/\([0-9a-f]\{128\}\)  .*.tar.\([a-z]\{2,3\}\)/\1:\2/"`
+      do
+        this_sha512sum=`echo ${line} | cut -d ':' -f 1`
+
+        case `echo ${line} | cut -d ':' -f 2` in
+          gz)
+            if [ "${filename}" = "" ] && ${has_gzip}
+            then
+              sha512sum=${this_sha512sum}
+              filename=${target}.tar.gz
+            fi
+          ;;
+          bz2)
+          if ${has_bzip2}
+          then
+            sha512sum=${this_sha512sum}
+            filename=${target}.tar.bz2
+            fi
+          ;;
+          xz)
+            if ${has_xz}
+            then
+              sha512sum=${this_sha512sum}
+              filename=${target}.tar.xz
+              break
+            fi
+          ;;
+          *)
+            log_error "parsing checksums.txt for ${target} from ${directory}"
+            return 1
+          ;;
+        esac
+      done
+
+      announce "Downloading ${target}..."
+      if ! download "${directory}/${filename}" "${filename}"
+      then
+        log_error "Unable to download ${tool}"
+        return 1
+      fi
+
+      if ${validate} && ! validate_file "${filename}" "${sha512sum}"
+      then
+        log_error "download for ${target} does not match checksum in checksums.txt"
+        return 1
+      elif ${validate}
+      then
+        echo ${checksum} > ${target}.sum
+      fi
+
+      rm -f checksums.txt
+
+      if ! unpack "${filename}"
+      then
+        log_error "Unable to unpack ${tool}"
+        return 1
+      fi
+    fi
+
+    announce "Applying patches..."
+    for patchfile in `ls -1 ${basedir}/patches/*.diff | grep "${target}"`
+    do
+      patch --batch --forward --directory=${target} --strip=1 < ${patchfile} >> ${log} 2>&1
     done
-
-    announce "Downloading ${target}..."
-    if ! download "${directory}/${filename}" "${filename}"
-    then
-      log_error "Unable to download ${tool}"
-      return 1
-    fi
-
-    if ${validate} && ! validate_file "${filename}" "${sha512sum}"
-    then
-      log_error "download for ${target} does not match checksum in checksums.txt"
-      return 1
-    elif ${validate}
-    then
-      echo ${checksum} > ${target}.sum
-    fi
-
-    rm -f checksums.txt
-
-    if ! unpack "${filename}"
-    then
-      log_error "Unable to unpack ${tool}"
-      return 1
-    fi
   fi
-
-  announce "Applying patches..."
-  for patchfile in `ls -1 ${basedir}/patches/*.diff | grep "${target}"`
-  do
-    patch --batch --forward --directory=${target} --strip=1 < ${patchfile} >> ${log} 2>&1
-  done
   [ "true" ]
 }
 
@@ -453,7 +477,7 @@ download_components()
 makejobs=`nproc --all`
 if [ $? -ne 0 ]
 then
-  makejobs=`sysctl hw.ncpu | awk '{print $2}'`
+  makejobs=`sysctl hw.ncpu | cut -f2 -d' '`
   if [ $? -ne 0 ]
   then
     makejobs="1"
@@ -612,7 +636,7 @@ configure_and_make () {
   wd_dir=${1}
   arch=${2}
   program_prefix="`echo ${arch} | cut -d '-' -f 1`-dreamcast"
-  conf_flags="--disable-werror --prefix=${installdir} --target=${arch} --program-prefix=${program_prefix}- ${3}"
+  conf_flags="--exec-prefix=${installdir}/dreamcast --disable-werror --prefix=${installdir} --target=${arch} --program-prefix=${program_prefix}- ${3}"
 
   announce "\n[ ${program_prefix}-${wd_dir} ]"
   announce "Configuring..."
@@ -626,32 +650,28 @@ configure_and_make () {
   cd ${builddir}
 }
 
-multilib_options="--with-multilib-list=m4-single-only,m4-nofpu,m4"
 library_options="--with-newlib --disable-libssp --disable-tls"
-cpu_options="--with-endian=little --with-cpu=m4-single-only"
+cpu_options="--with-endian=little --with-cpu=m4-single-only --with-multilib-list=m4-single-only,m4-nofpu,m4"
 #extra_gcc_options="--with-gmp=${builddir}/${gmp_dir} --with-mpfr=${builddir}/${mpfr_dir} --with-mpc=${builddir}/${mpc_dir}"
-#extra_gcc_options="--with-specs=\"%{shared:-Wl,-rpath -Wl,/specdemo}%{!shared:-Wl,-rpath -Wl,/specdemo}\""
 #echo extra options: ${extra_gcc_options}
 
 configure_and_make "${binutils_dir}"  "sh-elf"
 #configure_and_make "${gdb_dir}"       "sh-elf"
-configure_and_make "${gcc_dir}"       "sh-elf" "${multilib_options} ${cpu_options} ${library_options} ${extra_gcc_options} --enable-languages=c --without-headers"
-configure_and_make "${newlib_dir}"    "sh-elf" "${multilib_options} ${cpu_options}"
-configure_and_make "${gcc_dir}"       "sh-elf" "${multilib_options} ${cpu_options} ${library_options} ${extra_gcc_options} --enable-languages=c,c++,objc,obj-c++ --enable-threads=kos"
+configure_and_make "${gcc_dir}"       "sh-elf" "${cpu_options} ${library_options} ${extra_gcc_options} --enable-languages=c --without-headers"
+configure_and_make "${newlib_dir}"    "sh-elf" "${cpu_options}"
+configure_and_make "${gcc_dir}"       "sh-elf" "${cpu_options} ${library_options} ${extra_gcc_options} --enable-languages=c,c++,objc,obj-c++ --enable-threads=kos"
+#sudo cp ${basedir}/sh-dreamcast.spec ${packagedir}/${installdir}/lib/gcc/sh-elf/spec
 
 configure_and_make "${binutils_dir}"  "arm-eabi"
 #configure_and_make "${gdb_dir}"       "arm-eabi"
 configure_and_make "${gcc_dir}"       "arm-eabi" "${library_options} --enable-languages=c --without-headers --with-arch=armv4"
+#sudo cp ${basedir}/arm-dreamcast.spec ${packagedir}/${installdir}/lib/gcc/arm-eabi/spec
 
 echo "\n======= [ Installation complete! ] ======="
 
 exit 0
 
 === GCC options ===
-#required
--ml
--m4-single-only
-
 #optimizations
 -ffunction-sections
 -fdata-sections
@@ -660,8 +680,8 @@ exit 0
 -Wl,-Ttext=0x8c010000
 -Wl,--gc-sections
 
-
 #experimental linker flags
+--orphan-handling=discard
 -Wl,--gc-sections
 -Wl,--entry=0x8c010000
 -Wl,--section-start=text=0x8c010000
@@ -669,22 +689,12 @@ exit 0
 -Wl,--section-start=stack=0x8c010000
 
 
+# for non-specialized toolchains
+# SH toolchains
+CFLAGS= -ml -m4-single-only
+AFLAGS= -little
+LDFLAGS= -ml -m4-single-only -Wl,-Ttext=0x8c010000 -Wl,--gc-sections
 
-file: sh.opt
-
-msaturn
-Target RejectNegative Mask(SEGA_SATURN)
-Generate Sega Saturn compatible code
-
-mdreamcast
-Target RejectNegative Mask(SEGA_DREAMCAST)
-Generate Sega Dreamcast compatible code
-
-file: sh.h
-
-if(TARGET_SEGA_DREAMCAST) { \
-  builtin_define ("__SH4__"); \
-  builtin_define ("__LITTLE_ENDIAN__"); \
-  builtin_define ("__SH4_SINGLE_ONLY__"); \
-  break; \
-} \
+# ARM toolchains
+CFLAGS= -mcpu=arm7di -fno-strict-aliasing -Wl,--fix-v4bx -Wa,--fix-v4bx
+AFLAGS= -mcpu=arm7di --fix-v4bx
