@@ -632,39 +632,60 @@ ln -s "${builddir}/${gmp_dir}"  "${gcc_dir}/gmp"  >> ${log} 2>&1
 ln -s "${builddir}/${mpfr_dir}" "${gcc_dir}/mpfr" >> ${log} 2>&1
 ln -s "${builddir}/${mpc_dir}"  "${gcc_dir}/mpc"  >> ${log} 2>&1
 
+target_name () {
+  echo `echo ${1} | cut -d '-' -f 1`-dreamcast
+}
+
 configure_and_make () {
   wd_dir=${1}
-  arch=${2}
-  program_prefix="`echo ${arch} | cut -d '-' -f 1`-dreamcast"
-  conf_flags="--exec-prefix=${installdir}/dreamcast --disable-werror --prefix=${installdir} --target=${arch} --program-prefix=${program_prefix}- ${3}"
+  target=${2}
+  new_target=$(target_name ${target})
+  conf_flags="--prefix=${installdir}
+             --exec-prefix=${installdir}/dreamcast
+             --bindir=${installdir}/bin
+             --disable-werror --target=${target} --program-prefix=${new_target}- ${3}"
+#  conf_flags="${conf_flags}  --libdir=${installdir}/lib --libexecdir=${installdir}/libexec --with-slibdir=${installdir}/slib"
 
-  announce "\n[ ${program_prefix}-${wd_dir} ]"
+  cd ${builddir}
+  announce "\n[ ${new_target}-${wd_dir} ]"
   announce "Configuring..."
-  mkdir -p ${program_prefix}/${wd_dir}
-  cd ${program_prefix}/${wd_dir}
+  mkdir -p ${new_target}/${wd_dir}
+  cd ${new_target}/${wd_dir}
   sh ${builddir}/${wd_dir}/configure ${conf_flags} >> ${log} 2>&1
   announce "Building..."
   eval      "${make_tool} DESTDIR=${packagedir} -j${makejobs} >> ${log} 2>&1"
   announce "Installing..."
   eval "sudo ${make_tool} DESTDIR=${packagedir} install >> ${log} 2>&1"
-  cd ${builddir}
 }
 
 library_options="--with-newlib --disable-libssp --disable-tls"
-cpu_options="--with-endian=little --with-cpu=m4-single-only --with-multilib-list=m4-single-only,m4-nofpu,m4"
 #extra_gcc_options="--with-gmp=${builddir}/${gmp_dir} --with-mpfr=${builddir}/${mpfr_dir} --with-mpc=${builddir}/${mpc_dir}"
 #echo extra options: ${extra_gcc_options}
 
-configure_and_make "${binutils_dir}"  "sh-elf"
-#configure_and_make "${gdb_dir}"       "sh-elf"
-configure_and_make "${gcc_dir}"       "sh-elf" "${cpu_options} ${library_options} ${extra_gcc_options} --enable-languages=c --without-headers"
-configure_and_make "${newlib_dir}"    "sh-elf" "${cpu_options}"
-configure_and_make "${gcc_dir}"       "sh-elf" "${cpu_options} ${library_options} ${extra_gcc_options} --enable-languages=c,c++,objc,obj-c++ --enable-threads=kos"
+target="sh-elf"
+cpu_options="--with-endian=little --with-cpu=m4-single-only --with-multilib-list=m4-single-only,m4-nofpu,m4"
+configure_and_make ${binutils_dir}  ${target}
+#configure_and_make ${gdb_dir}       ${target}
+configure_and_make ${gcc_dir}       ${target} "${cpu_options} ${library_options} ${extra_gcc_options} --enable-languages=c --without-headers"
+configure_and_make ${newlib_dir}    ${target} "${cpu_options}"
+configure_and_make ${gcc_dir}       ${target} "${cpu_options} ${library_options} ${extra_gcc_options} --enable-languages=c,c++,objc,obj-c++ --enable-threads=kos"
+
+sudo mkdir -p ${packagedir}/${installdir}/lib/gcc
+sudo ln -s -r ${packagedir}/${installdir}/dreamcast/lib/gcc/${target} ${packagedir}/${installdir}/lib/gcc/$(target_name ${target})
+sudo mkdir -p ${packagedir}/${installdir}/libexec/gcc
+sudo ln -s -r ${packagedir}/${installdir}/dreamcast/libexec/gcc/${target} ${packagedir}/${installdir}/libexec/gcc/$(target_name ${target})
 #sudo cp ${basedir}/sh-dreamcast.spec ${packagedir}/${installdir}/lib/gcc/sh-elf/spec
 
-configure_and_make "${binutils_dir}"  "arm-eabi"
-#configure_and_make "${gdb_dir}"       "arm-eabi"
-configure_and_make "${gcc_dir}"       "arm-eabi" "${library_options} --enable-languages=c --without-headers --with-arch=armv4"
+target="arm-eabi"
+cpu_options="--with-arch=armv4"
+configure_and_make ${binutils_dir}  ${target}
+#configure_and_make ${gdb_dir}       ${target}
+configure_and_make ${gcc_dir}       ${target} "${cpu_options} ${library_options} --enable-languages=c --without-headers"
+
+sudo mkdir -p ${packagedir}/${installdir}/lib/gcc
+sudo ln -s -r ${packagedir}/${installdir}/dreamcast/lib/gcc/${target} ${packagedir}/${installdir}/lib/gcc/$(target_name ${target})
+sudo mkdir -p ${packagedir}/${installdir}/libexec/gcc
+sudo ln -s -r ${packagedir}/${installdir}/dreamcast/libexec/gcc/${target} ${packagedir}/${installdir}/libexec/gcc/$(target_name ${target})
 #sudo cp ${basedir}/arm-dreamcast.spec ${packagedir}/${installdir}/lib/gcc/arm-eabi/spec
 
 echo "\n======= [ Installation complete! ] ======="
