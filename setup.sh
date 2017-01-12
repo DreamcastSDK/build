@@ -637,6 +637,7 @@ target_name () {
 }
 
 configure_and_make () {
+return 0
   wd_dir=${1}
   target=${2}
   new_target=$(target_name ${target})
@@ -674,7 +675,7 @@ sudo mkdir -p ${packagedir}/${installdir}/lib/gcc
 sudo ln -s -r ${packagedir}/${installdir}/dreamcast/lib/gcc/${target} ${packagedir}/${installdir}/lib/gcc/$(target_name ${target})
 sudo mkdir -p ${packagedir}/${installdir}/libexec/gcc
 sudo ln -s -r ${packagedir}/${installdir}/dreamcast/libexec/gcc/${target} ${packagedir}/${installdir}/libexec/gcc/$(target_name ${target})
-#sudo cp ${basedir}/sh-dreamcast.spec ${packagedir}/${installdir}/lib/gcc/sh-elf/spec
+sudo cp ${basedir}/$(target_name ${target}).specs ${packagedir}/${installdir}/dreamcast/${target}/lib/specs
 
 target="arm-eabi"
 cpu_options="--with-arch=armv4"
@@ -686,7 +687,7 @@ sudo mkdir -p ${packagedir}/${installdir}/lib/gcc
 sudo ln -s -r ${packagedir}/${installdir}/dreamcast/lib/gcc/${target} ${packagedir}/${installdir}/lib/gcc/$(target_name ${target})
 sudo mkdir -p ${packagedir}/${installdir}/libexec/gcc
 sudo ln -s -r ${packagedir}/${installdir}/dreamcast/libexec/gcc/${target} ${packagedir}/${installdir}/libexec/gcc/$(target_name ${target})
-#sudo cp ${basedir}/arm-dreamcast.spec ${packagedir}/${installdir}/lib/gcc/arm-eabi/spec
+sudo cp ${basedir}/$(target_name ${target}).specs ${packagedir}/${installdir}/dreamcast/${target}/lib/specs
 
 echo "\n======= [ Installation complete! ] ======="
 
