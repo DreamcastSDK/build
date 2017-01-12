@@ -641,9 +641,12 @@ configure_and_make () {
   target=${2}
   new_target=$(target_name ${target})
   conf_flags="--prefix=${installdir}
-             --exec-prefix=${installdir}/dreamcast
-             --bindir=${installdir}/bin
-             --disable-werror --target=${target} --program-prefix=${new_target}- ${3}"
+              --exec-prefix=${installdir}/dreamcast
+              --bindir=${installdir}/bin
+              --disable-werror
+              --target=${target}
+              --program-prefix=${new_target}-
+              ${3}"
 
   cd ${builddir}
   announce "\n[ ${new_target}-${wd_dir} ]"
