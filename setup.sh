@@ -672,11 +672,15 @@ configure_and_make ${gcc_dir}       ${target} "${cpu_options} ${library_options}
 configure_and_make ${newlib_dir}    ${target} "${cpu_options}"
 configure_and_make ${gcc_dir}       ${target} "${cpu_options} ${library_options} ${extra_gcc_options} --enable-languages=c,c++,objc,obj-c++ --enable-threads=kos"
 
-sudo mkdir -p ${packagedir}/${installdir}/lib/gcc
-sudo ln -s -r ${packagedir}/${installdir}/dreamcast/lib/gcc/${target} ${packagedir}/${installdir}/lib/gcc/$(target_name ${target})
-sudo mkdir -p ${packagedir}/${installdir}/libexec/gcc
-sudo ln -s -r ${packagedir}/${installdir}/dreamcast/libexec/gcc/${target} ${packagedir}/${installdir}/libexec/gcc/$(target_name ${target})
-sudo cp ${basedir}/$(target_name ${target}).specs ${packagedir}/${installdir}/dreamcast/${target}/lib/specs
+#sudo mkdir -p ${packagedir}/${installdir}/lib/gcc
+#sudo ln -s -r ${packagedir}/${installdir}/dreamcast/lib/gcc/${target} ${packagedir}/${installdir}/lib/gcc/$(target_name ${target})
+#sudo mkdir -p ${packagedir}/${installdir}/libexec/gcc
+#sudo ln -s -r ${packagedir}/${installdir}/dreamcast/libexec/gcc/${target} ${packagedir}/${installdir}/libexec/gcc/$(target_name ${target})
+sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${packagedir}/${installdir}/dreamcast/${target}/lib/specs
+
+sudo rm ${packagedir}/${installdir}/dreamcast/${target}/lib/ldscripts/shlelf.*
+sudo cp ${basedir}/scripts/shlelf.x ${packagedir}/${installdir}/dreamcast/${target}/lib/ldscripts/
+
 
 target="arm-eabi"
 cpu_options="--with-arch=armv4"
@@ -684,11 +688,11 @@ configure_and_make ${binutils_dir}  ${target}
 #configure_and_make ${gdb_dir}       ${target}
 configure_and_make ${gcc_dir}       ${target} "${cpu_options} ${library_options} --enable-languages=c --without-headers"
 
-sudo mkdir -p ${packagedir}/${installdir}/lib/gcc
-sudo ln -s -r ${packagedir}/${installdir}/dreamcast/lib/gcc/${target} ${packagedir}/${installdir}/lib/gcc/$(target_name ${target})
-sudo mkdir -p ${packagedir}/${installdir}/libexec/gcc
-sudo ln -s -r ${packagedir}/${installdir}/dreamcast/libexec/gcc/${target} ${packagedir}/${installdir}/libexec/gcc/$(target_name ${target})
-sudo cp ${basedir}/$(target_name ${target}).specs ${packagedir}/${installdir}/dreamcast/${target}/lib/specs
+#sudo mkdir -p ${packagedir}/${installdir}/lib/gcc
+#sudo ln -s -r ${packagedir}/${installdir}/dreamcast/lib/gcc/${target} ${packagedir}/${installdir}/lib/gcc/$(target_name ${target})
+#sudo mkdir -p ${packagedir}/${installdir}/libexec/gcc
+#sudo ln -s -r ${packagedir}/${installdir}/dreamcast/libexec/gcc/${target} ${packagedir}/${installdir}/libexec/gcc/$(target_name ${target})
+sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${packagedir}/${installdir}/dreamcast/${target}/lib/specs
 
 echo "\n======= [ Installation complete! ] ======="
 
