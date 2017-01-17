@@ -28,15 +28,13 @@ log_warning () {
   announce "WARNING: ${1}"
 }
 
-# Function to detect if a program is usable
+# Function to extract value from argument
 # @param[in] $1 input string e.g. --flagname=value
-# @return "value"
 arg_value () {
   echo "${1}" | sed -e "s/--[a-z]*=\(.*\)/\1/"
 }
 
-
-# Function to detect if a program is usable
+# Function that faults if a directory doesn't exist
 # @param[in] $1 program name
 # @param[in] $2 program directory
 assert_dir () {
@@ -46,7 +44,6 @@ assert_dir () {
     exit 1
   fi
 }
-
 
 # Function to check for relative directory and makes it absolute
 # @param[in] $1  The directory to make absolute if necessary.
@@ -62,7 +59,6 @@ absolutedir()
     ;;
   esac
 }
-
 
 # Function to detect if a program is usable
 # @param[in] $1 program
@@ -392,11 +388,14 @@ gnu_download_tool ()
       fi
     fi
 
-    announce "Applying patches..."
-    for patchfile in `ls -1 ${basedir}/patches/*.diff | grep "${target}"`
-    do
-      patch --batch --forward --directory=${target} --strip=1 < ${patchfile} >> ${log} 2>&1
-    done
+    if ${patch}
+    then
+      announce "Applying patches..."
+      for patchfile in `ls -1 ${basedir}/patches/*.diff | grep "${target}"`
+      do
+        patch --batch --forward --directory=${target} --strip=1 < ${patchfile} >> ${log} 2>&1
+      done
+    fi
   fi
   [ "true" ]
 }
@@ -411,6 +410,16 @@ download_components()
   IFS="
 " # We only want the newline character
 
+  announce "\nUpdating configuration defaults..."
+  if ! download "http://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.guess;hb=HEAD" "${builddir}/config.guess" "silent"
+  then
+    log_error "Unable to download config.guess"
+  fi
+  if ! download "http://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.sub;hb=HEAD"   "${builddir}/config.sub"   "silent"
+  then
+    log_error "Unable to download config.sub"
+  fi
+
   for line in `cat ${basedir}/components.conf | grep -v '^#' | grep -v '^$'`
   do
     echo ""
@@ -423,6 +432,12 @@ download_components()
         if ! gnu_download_tool "${name}" "${version}" "${forced_url}"
         then
           return 1
+        fi
+
+        if [ -e ${builddir}/config.guess ]
+        then
+          cp ${builddir}/config.guess ${builddir}/${name}-${version}
+          cp ${builddir}/config.sub ${builddir}/${name}-${version}
         fi
       ;;
 
@@ -461,41 +476,10 @@ download_components()
     esac
   done
 
-
   # Restore IFS before returning
   IFS=${OLD_IFS}
 }
 
-
-################################################################################
-#                                                                              #
-#                               Detect programs                                #
-#                                                                              #
-################################################################################
-
-# Determine the number of processes to use for building
-makejobs=`nproc --all`
-if [ $? -ne 0 ]
-then
-  makejobs=`sysctl hw.ncpu | cut -f2 -d' '`
-  if [ $? -ne 0 ]
-  then
-    makejobs="1"
-  fi
-fi
-
-has_make=$(detect "make")
-has_gmake=$(detect "gmake")
-if ${has_make}
-then
-  make_tool="make"
-elif ${has_gmake}
-then
-  make_tool="gmake"
-else
-  log_error "no make system installed?!"
-  exit 1
-fi
 
 ################################################################################
 #                                                                              #
@@ -505,6 +489,8 @@ fi
 # Defaults
 force="false"
 clone="false"
+patch="true"
+build="true"
 git_transport_prefix="https://github.com"
 gnu_url="ftp://gcc.gnu.org/pub"
 
@@ -516,6 +502,13 @@ installdir="/usr/local"
 until
   opt=$1
   case ${opt} in
+    --no-patch)
+      patch="false"
+    ;;
+
+    --no-build)
+      build="false"
+    ;;
 
     --force)
       force="true"
@@ -565,11 +558,51 @@ do
   shift
 done
 
+finaldir=${packagedir}${installdir}
+
 ################################################################################
 #                                                                              #
 #                               Initialize setup                               #
 #                                                                              #
 ################################################################################
+
+echo "\n======= [ Initializing ] =======\n"
+
+# Determine the number of processes to use for building
+makejobs=`nproc --all`
+if [ $? -ne 0 ]
+then
+  makejobs=`sysctl hw.ncpu | cut -f2 -d' '`
+  if [ $? -ne 0 ]
+  then
+    makejobs="1"
+  fi
+fi
+
+has_make=$(detect "make")
+has_gmake=$(detect "gmake")
+if ${has_make}
+then
+  make_tool="make"
+elif ${has_gmake}
+then
+  make_tool="gmake"
+else
+  log_error "no make system installed?!"
+  exit 1
+fi
+
+# GCC compiles fine with clang, but only if we use libstdc++ instead of libc++.
+if $(detect "g++")
+then
+  export CXX="g++"
+elif $(detect "clang++")
+then
+  export CXX="clang -stdlib=libstdc++"
+else
+  log_error "No C++ compiler was found on this system"
+  exit 1
+fi
 
 # Create and then move into builddir location
 
@@ -589,10 +622,16 @@ then
 fi
 
 # Set up a log file
-log="${builddir}/build-$(date +%F-%H%M).log"
+#log="${builddir}/build-$(date +%F-%H%M).log"
+log="${builddir}/build.log"
 rm -f "${log}"
 
-echo "\nLogging to ${log}"
+echo "build   dir: ${builddir}"
+echo "install dir: ${installdir}"
+echo "package dir: ${packagedir}"
+echo "output  dir: ${finaldir}"
+echo "C++ compiler: ${CXX}"
+echo "Logging to: ${log}"
 
 ################################################################################
 #                                                                              #
@@ -611,7 +650,6 @@ fi
 
 echo "\n======= [ Downloads complete! ] ======="
 
-
 ################################################################################
 #                                                                              #
 #                          Configure, build, install                           #
@@ -628,9 +666,19 @@ assert_dir "MPFR"     "${mpfr_dir}"
 assert_dir "MPC"      "${mpc_dir}"
 
 # make symlinks for GCC... at least until I figure out the flags to specify their locations
-ln -s "${builddir}/${gmp_dir}"  "${gcc_dir}/gmp"  >> ${log} 2>&1
-ln -s "${builddir}/${mpfr_dir}" "${gcc_dir}/mpfr" >> ${log} 2>&1
-ln -s "${builddir}/${mpc_dir}"  "${gcc_dir}/mpc"  >> ${log} 2>&1
+if ! [ -e ${builddir}/${gcc_dir}/gmp ]
+then
+  ln -srf ${builddir}/${gmp_dir}  ${builddir}/${gcc_dir}/gmp
+  ln -srf ${builddir}/${mpfr_dir} ${builddir}/${gcc_dir}/mpfr
+  ln -srf ${builddir}/${mpc_dir}  ${builddir}/${gcc_dir}/mpc
+fi
+
+if ! ${build}
+then
+  log_error "Not building.  Finished!"
+  exit 0
+fi
+
 
 target_name () {
   echo `echo ${1} | cut -d '-' -f 1`-dreamcast
@@ -647,39 +695,85 @@ configure_and_make () {
               --target=${target}
               --program-prefix=${new_target}-
               ${3}"
+  targetdir=${builddir}/${new_target}-${wd_dir}
 
-  cd ${builddir}
   announce "\n[ ${new_target}-${wd_dir} ]"
   announce "Configuring..."
-  mkdir -p ${new_target}/${wd_dir}
-  cd ${new_target}/${wd_dir}
-  sh ${builddir}/${wd_dir}/configure ${conf_flags} >> ${log} 2>&1
+  mkdir -p ${targetdir}
+  cd ${targetdir}
+  if ! sh ${builddir}/${wd_dir}/configure ${conf_flags} > config.log 2>&1
+  then
+    announce "FAILED!\nSee ${targetdir}/config.log for details."
+    exit 1
+  fi
   announce "Building..."
-  eval      "${make_tool} DESTDIR=${packagedir} -j${makejobs} >> ${log} 2>&1"
+  if ! eval      "${make_tool} DESTDIR=${packagedir} -j${makejobs} > build.log 2>&1"
+  then
+    announce "FAILED!\nSee ${targetdir}/build.log for details."
+    exit 1
+  fi
   announce "Installing..."
-  eval "sudo ${make_tool} DESTDIR=${packagedir} install >> ${log} 2>&1"
+  if ! eval "sudo ${make_tool} DESTDIR=${packagedir} install > install.log 2>&1"
+  then
+    announce "FAILED!\nSee ${targetdir}/install.log for details."
+    exit 1
+  fi
+  cd ${builddir}
+  rm -rf ${targetdir} > /dev/null 2>&1
 }
 
 library_options="--with-newlib --disable-libssp --disable-tls"
-#extra_gcc_options="--with-gmp=${builddir}/${gmp_dir} --with-mpfr=${builddir}/${mpfr_dir} --with-mpc=${builddir}/${mpc_dir}"
-#echo extra options: ${extra_gcc_options}
 
 target="sh-elf"
 cpu_options="--with-endian=little --with-cpu=m4-single-only --with-multilib-list=m4-single-only,m4-nofpu,m4"
 configure_and_make ${binutils_dir}  ${target}
 #configure_and_make ${gdb_dir}       ${target}
-configure_and_make ${gcc_dir}       ${target} "${cpu_options} ${library_options} ${extra_gcc_options} --enable-languages=c --without-headers"
-configure_and_make ${newlib_dir}    ${target} "${cpu_options}"
-configure_and_make ${gcc_dir}       ${target} "${cpu_options} ${library_options} ${extra_gcc_options} --enable-languages=c,c++,objc,obj-c++ --enable-threads=kos"
+configure_and_make ${gcc_dir}       ${target} "${cpu_options} ${library_options} --enable-languages=c --without-headers"
 
-#sudo mkdir -p ${packagedir}/${installdir}/lib/gcc
-#sudo ln -s -r ${packagedir}/${installdir}/dreamcast/lib/gcc/${target} ${packagedir}/${installdir}/lib/gcc/$(target_name ${target})
-#sudo mkdir -p ${packagedir}/${installdir}/libexec/gcc
-#sudo ln -s -r ${packagedir}/${installdir}/dreamcast/libexec/gcc/${target} ${packagedir}/${installdir}/libexec/gcc/$(target_name ${target})
-sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${packagedir}/${installdir}/dreamcast/${target}/lib/specs
+export CC_FOR_TARGET=${finaldir}/bin/sh-dreamcast-gcc
+export CXX_FOR_TARGET=${finaldir}/bin/sh-dreamcast-c++
+export GCC_FOR_TARGET=${finaldir}/bin/sh-dreamcast-gcc
+export AR_FOR_TARGET=${finaldir}/bin/sh-dreamcast-ar
+export AS_FOR_TARGET=${finaldir}/bin/sh-dreamcast-as
+export LD_FOR_TARGET=${finaldir}/bin/sh-dreamcast-ld
+export NM_FOR_TARGET=${finaldir}/bin/sh-dreamcast-nm
+export OBJDUMP_FOR_TARGET=${finaldir}/bin/sh-dreamcast-objdump
+export RANLIB_FOR_TARGET=${finaldir}/bin/sh-dreamcast-ranlib
+export READELF_FOR_TARGET=${finaldir}/bin/sh-dreamcast-readelf
+export STRIP_FOR_TARGET=${finaldir}/bin/sh-dreamcast-strip
 
-sudo rm ${packagedir}/${installdir}/dreamcast/${target}/lib/ldscripts/shlelf.*
-sudo cp ${basedir}/scripts/shlelf.x ${packagedir}/${installdir}/dreamcast/${target}/lib/ldscripts/
+configure_and_make ${newlib_dir}    ${target} "${cpu_options} --enable-dependency-tracking"
+
+unset CC_FOR_TARGET
+unset CXX_FOR_TARGET
+unset GCC_FOR_TARGET
+unset AR_FOR_TARGET
+unset AS_FOR_TARGET
+unset LD_FOR_TARGET
+unset NM_FOR_TARGET
+unset OBJDUMP_FOR_TARGET
+unset RANLIB_FOR_TARGET
+unset READELF_FOR_TARGET
+unset STRIP_FOR_TARGET
+
+sudo mkdir -p ${finaldir}/dreamcast/${target}/include/sys
+sudo cp    ${builddir}/kos/common/include/pthread.h      ${finaldir}/dreamcast/${target}/include
+sudo cp    ${builddir}/kos/common/include/sys/_pthread.h ${finaldir}/dreamcast/${target}/include/sys
+sudo cp    ${builddir}/kos/common/include/sys/sched.h    ${finaldir}/dreamcast/${target}/include/sys
+sudo cp -r ${builddir}/kos/common/include/kos            ${finaldir}/dreamcast/${target}/include
+sudo cp -r ${builddir}/kos/dreamcast/include/arch        ${finaldir}/dreamcast/${target}/include
+sudo cp -r ${builddir}/kos/dreamcast/include/dc          ${finaldir}/dreamcast/${target}/include
+
+#export CFLAGS="-I${finaldir}/dreamcast/${target}/include"
+configure_and_make ${gcc_dir}       ${target} "${cpu_options} ${library_options} --enable-languages=c,c++ --enable-threads=kos"
+
+#sudo mkdir -p ${finaldir}/lib/gcc
+#sudo ln -srf ${finaldir}/dreamcast/lib/gcc/${target} ${finaldir}/lib/gcc/$(target_name ${target})
+#sudo mkdir -p ${finaldir}/libexec/gcc
+#sudo ln -srf ${finaldir}/dreamcast/libexec/gcc/${target} ${finaldir}/libexec/gcc/$(target_name ${target})
+sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${finaldir}/dreamcast/${target}/lib/specs
+sudo rm ${finaldir}/dreamcast/${target}/lib/ldscripts/shlelf.*
+sudo cp ${basedir}/scripts/shlelf.x ${finaldir}/dreamcast/${target}/lib/ldscripts/
 
 
 target="arm-eabi"
@@ -688,11 +782,11 @@ configure_and_make ${binutils_dir}  ${target}
 #configure_and_make ${gdb_dir}       ${target}
 configure_and_make ${gcc_dir}       ${target} "${cpu_options} ${library_options} --enable-languages=c --without-headers"
 
-#sudo mkdir -p ${packagedir}/${installdir}/lib/gcc
-#sudo ln -s -r ${packagedir}/${installdir}/dreamcast/lib/gcc/${target} ${packagedir}/${installdir}/lib/gcc/$(target_name ${target})
-#sudo mkdir -p ${packagedir}/${installdir}/libexec/gcc
-#sudo ln -s -r ${packagedir}/${installdir}/dreamcast/libexec/gcc/${target} ${packagedir}/${installdir}/libexec/gcc/$(target_name ${target})
-sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${packagedir}/${installdir}/dreamcast/${target}/lib/specs
+#sudo mkdir -p ${finaldir}/lib/gcc
+#sudo ln -sr ${finaldir}/dreamcast/lib/gcc/${target} ${finaldir}/lib/gcc/$(target_name ${target})
+#sudo mkdir -p ${finaldir}/libexec/gcc
+#sudo ln -sr ${finaldir}/dreamcast/libexec/gcc/${target} ${finaldir}/libexec/gcc/$(target_name ${target})
+sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${finaldir}/dreamcast/${target}/lib/specs
 
 echo "\n======= [ Installation complete! ] ======="
 
