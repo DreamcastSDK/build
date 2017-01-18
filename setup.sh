@@ -174,12 +174,28 @@ unpack ()
 # @param[in] $2 expected SH256 checksum
 
 # @return 0 on success, 1 on failure.
+has_sha512sum=$(detect "sha512sum")
+has_shasum=$(detect "shasum")
+has_sha512=$(detect "sha512")
 validate_file () {
   filename=${1}
   sha512sum=${2}
 
   echo -n "Validating ${filename}... "
-  checksum=`sha512sum ${filename} | cut -d ' ' -f 1`
+  if ${has_sha512sum}
+  then
+    checksum=`sha512sum ${filename} | cut -d ' ' -f 1`
+  elif ${has_shasum}
+  then
+    checksum=`shasum -a 512 ${filename} | cut -d ' ' -f 1`
+  elif ${has_sha512}
+  then
+    checksum=`sha512 ${filename} | cut -d ' ' -f 1`
+  else
+    echo "No checksum tool found. Skipping check."
+    return 0
+  fi
+
   if [ "${checksum}" != "${sha512sum}" ]
   then
     echo "INVALID!"
@@ -259,7 +275,7 @@ gnu_download_tool ()
   urlbase=$3
   eval "${tool}_dir=${target}"
 
-  if [ "${urlbase}" = "" ]
+  if [ "x${urlbase}" = "x" ]
   then
     urlbase=${gnu_url}
   fi
@@ -321,7 +337,7 @@ gnu_download_tool ()
         if download "${directory}/sha512.sum" "checksums.txt" "silent"
         then
           output=`grep "${target}.tar" checksums.txt`
-          if [ "${output}" != "" ]
+          if [ "x${output}" != "x" ]
           then
             echo " found."
             break
@@ -335,7 +351,7 @@ gnu_download_tool ()
 
         case `echo ${line} | cut -d ':' -f 2` in
           gz)
-            if [ "${filename}" = "" ] && ${has_gzip}
+            if [ "x${filename}" = "x" ] && ${has_gzip}
             then
               sha512sum=${this_sha512sum}
               filename=${target}.tar.gz
@@ -445,13 +461,13 @@ download_components()
         repo=`  echo ${line} | cut -d ':' -f 2`
         branch=`echo ${line} | cut -d ':' -f 3`
         organization=`  echo ${line} | cut -d ':' -f 4`
-        if [ "${branch}" = "" ]
+        if [ "x${branch}" = "x" ]
         then
           branch="master"
         fi
-        if [ "${organization}" = "" ]
+        if [ "x${organization}" = "x" ]
         then
-          organization="KallistiOS"
+          organization="GravisZro"
         fi
 
         if ! git_tool "${repo}" "${branch}" "${organization}"
@@ -494,7 +510,6 @@ build=true
 git_transport_prefix="https://github.com"
 gnu_url="ftp://gcc.gnu.org/pub"
 
-packagedir="/"
 basedir=$(absolutedir `dirname $0`)
 builddir=$(absolutedir "${basedir}/builds")
 installdir="/usr/local"
@@ -530,11 +545,6 @@ until
       installdir=$(absolutedir $(arg_value ${opt}))
     ;;
 
-# hidden option! only useful for building packages!
-    --packagedir=*)
-      packagedir=$(absolutedir $(arg_value ${opt}))
-    ;;
-
     --makejobs=*)
       makejobs=$(arg_value ${opt})
     ;;
@@ -542,6 +552,8 @@ until
 
     ?*)
       echo "Usage: ./setup.sh [--force]"
+      echo "                  [--no-patch]"
+      echo "                  [--no-build]"
       echo "                  [--clone | --download]"
       echo "                  [--builddir=<dir>]"
       echo "                  [--installdir=<dir>]"
@@ -557,8 +569,6 @@ until
 do
   shift
 done
-
-finaldir=${packagedir}${installdir}
 
 ################################################################################
 #                                                                              #
@@ -588,7 +598,7 @@ elif ${has_gmake}
 then
   make_tool="gmake"
 else
-  log_error "no make system installed?!"
+  log_error "No make system installed!"
   exit 1
 fi
 
@@ -600,7 +610,7 @@ elif $(detect "clang++")
 then
   export CXX="clang -stdlib=libstdc++"
 else
-  log_error "No C++ compiler was found on this system"
+  log_error "No C++ compiler was found on this system!"
   exit 1
 fi
 
@@ -610,14 +620,14 @@ if [ ! -e "${builddir}" ]
 then
   if ! mkdir "${builddir}"
   then
-    log_error "Unable to create directory for downloads/clones"
+    log_error "Unable to create directory for downloads/clones!"
     exit 1
   fi
 fi
 
 if ! cd "${builddir}"
 then
-  log_error "Unable to change to directory for downloads/clones"
+  log_error "Unable to change to directory for downloads/clones!"
   exit 1
 fi
 
@@ -628,8 +638,6 @@ rm -f "${log}"
 
 echo "build   dir: ${builddir}"
 echo "install dir: ${installdir}"
-echo "package dir: ${packagedir}"
-echo "output  dir: ${finaldir}"
 echo "C++ compiler: ${CXX}"
 echo "Logging to: ${log}"
 
@@ -650,6 +658,8 @@ fi
 
 echo "\n======= [ Downloads complete! ] ======="
 
+sudo rm -rf ${installdir}/dreamcast ${installdir}/bin/sh-dreamcast-* ${installdir}/bin/sh-elf-${gcc_dir} ${installdir}/bin/arm-eabi-${gcc_dir}
+
 ################################################################################
 #                                                                              #
 #                          Configure, build, install                           #
@@ -659,7 +669,6 @@ echo "\n======= [ Configuring, building, installing ] ======="
 
 assert_dir "Binutils" "${binutils_dir}"
 assert_dir "GCC"      "${gcc_dir}"
-#assert_dir "GDB"      "${gdb_dir}"
 assert_dir "Newlib"   "${newlib_dir}"
 assert_dir "GMP"      "${gmp_dir}"
 assert_dir "MPFR"     "${mpfr_dir}"
@@ -709,13 +718,13 @@ configure_and_make () {
     exit 1
   fi
   announce "Building..."
-  if ! eval      "${make_tool} DESTDIR=${packagedir} -j${makejobs} > build.log 2>&1"
+  if ! eval      "${make_tool} -j${makejobs} > build.log 2>&1"
   then
     announce "FAILED!\nSee ${targetdir}/build.log for details."
     exit 1
   fi
   announce "Installing..."
-  if ! eval "sudo ${make_tool} DESTDIR=${packagedir} install > install.log 2>&1"
+  if ! eval "sudo ${make_tool} install > install.log 2>&1"
   then
     announce "FAILED!\nSee ${targetdir}/install.log for details."
     exit 1
@@ -728,23 +737,26 @@ library_options="--with-newlib --disable-libssp --disable-tls"
 
 target="sh-elf"
 cpu_options="--with-endian=little --with-cpu=m4-single-only --with-multilib-list=m4-single-only,m4-nofpu,m4"
-configure_and_make ${binutils_dir}  ${target}
-#configure_and_make ${gdb_dir}       ${target}
-configure_and_make ${gcc_dir}       ${target} "${cpu_options} ${library_options} --enable-languages=c --without-headers"
+configure_and_make ${binutils_dir} ${target}
+if [ -e "${gdb_dir}" ]
+then
+  configure_and_make ${gdb_dir} ${target}
+fi
+configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --enable-languages=c --without-headers"
 
-export CC_FOR_TARGET=${finaldir}/bin/sh-dreamcast-gcc
-export CXX_FOR_TARGET=${finaldir}/bin/sh-dreamcast-c++
-export GCC_FOR_TARGET=${finaldir}/bin/sh-dreamcast-gcc
-export AR_FOR_TARGET=${finaldir}/bin/sh-dreamcast-ar
-export AS_FOR_TARGET=${finaldir}/bin/sh-dreamcast-as
-export LD_FOR_TARGET=${finaldir}/bin/sh-dreamcast-ld
-export NM_FOR_TARGET=${finaldir}/bin/sh-dreamcast-nm
-export OBJDUMP_FOR_TARGET=${finaldir}/bin/sh-dreamcast-objdump
-export RANLIB_FOR_TARGET=${finaldir}/bin/sh-dreamcast-ranlib
-export READELF_FOR_TARGET=${finaldir}/bin/sh-dreamcast-readelf
-export STRIP_FOR_TARGET=${finaldir}/bin/sh-dreamcast-strip
+export CC_FOR_TARGET=${installdir}/bin/sh-dreamcast-gcc
+export CXX_FOR_TARGET=${installdir}/bin/sh-dreamcast-c++
+export GCC_FOR_TARGET=${installdir}/bin/sh-dreamcast-gcc
+export AR_FOR_TARGET=${installdir}/bin/sh-dreamcast-ar
+export AS_FOR_TARGET=${installdir}/bin/sh-dreamcast-as
+export LD_FOR_TARGET=${installdir}/bin/sh-dreamcast-ld
+export NM_FOR_TARGET=${installdir}/bin/sh-dreamcast-nm
+export OBJDUMP_FOR_TARGET=${installdir}/bin/sh-dreamcast-objdump
+export RANLIB_FOR_TARGET=${installdir}/bin/sh-dreamcast-ranlib
+export READELF_FOR_TARGET=${installdir}/bin/sh-dreamcast-readelf
+export STRIP_FOR_TARGET=${installdir}/bin/sh-dreamcast-strip
 
-configure_and_make ${newlib_dir}    ${target} "${cpu_options}"
+configure_and_make ${newlib_dir} ${target} "${cpu_options}"
 
 unset CC_FOR_TARGET
 unset CXX_FOR_TARGET
@@ -758,36 +770,30 @@ unset RANLIB_FOR_TARGET
 unset READELF_FOR_TARGET
 unset STRIP_FOR_TARGET
 
-sudo cp    ${builddir}/kos/common/include/pthread.h      ${finaldir}/dreamcast/${target}/include
-sudo cp    ${builddir}/kos/common/include/sys/_pthread.h ${finaldir}/dreamcast/${target}/include/sys
-sudo cp    ${builddir}/kos/common/include/sys/sched.h    ${finaldir}/dreamcast/${target}/include/sys
-sudo cp -r ${builddir}/kos/common/include/kos            ${finaldir}/dreamcast/${target}/include
-sudo cp -r ${builddir}/kos/dreamcast/include/arch        ${finaldir}/dreamcast/${target}/include
-sudo cp -r ${builddir}/kos/dreamcast/include/dc          ${finaldir}/dreamcast/${target}/include
+sudo cp    ${builddir}/kos/common/include/pthread.h      ${installdir}/dreamcast/${target}/include
+sudo cp    ${builddir}/kos/common/include/sys/_pthread.h ${installdir}/dreamcast/${target}/include/sys
+sudo cp    ${builddir}/kos/common/include/sys/sched.h    ${installdir}/dreamcast/${target}/include/sys
+sudo cp -r ${builddir}/kos/common/include/kos            ${installdir}/dreamcast/${target}/include
+sudo cp -r ${builddir}/kos/dreamcast/include/arch        ${installdir}/dreamcast/${target}/include
+sudo cp -r ${builddir}/kos/dreamcast/include/dc          ${installdir}/dreamcast/${target}/include
 
-#export CFLAGS="-I${finaldir}/dreamcast/${target}/include"
-configure_and_make ${gcc_dir}       ${target} "${cpu_options} ${library_options} --enable-languages=c,c++ --enable-threads=kos"
+configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --enable-languages=c,c++ --enable-threads=kos"
 
-#sudo mkdir -p ${finaldir}/lib/gcc
-#sudo ln -srf ${finaldir}/dreamcast/lib/gcc/${target} ${finaldir}/lib/gcc/$(target_name ${target})
-#sudo mkdir -p ${finaldir}/libexec/gcc
-#sudo ln -srf ${finaldir}/dreamcast/libexec/gcc/${target} ${finaldir}/libexec/gcc/$(target_name ${target})
-sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${finaldir}/dreamcast/${target}/lib/specs
-sudo rm ${finaldir}/dreamcast/${target}/lib/ldscripts/shlelf.*
-sudo cp ${basedir}/scripts/shlelf.x ${finaldir}/dreamcast/${target}/lib/ldscripts/
+sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${installdir}/dreamcast/${target}/lib/specs
+sudo rm ${installdir}/dreamcast/${target}/lib/ldscripts/shlelf.*
+sudo cp ${basedir}/scripts/shlelf.x ${installdir}/dreamcast/${target}/lib/ldscripts/
 
 
 target="arm-eabi"
 cpu_options="--with-arch=armv4"
-configure_and_make ${binutils_dir}  ${target}
-#configure_and_make ${gdb_dir}       ${target}
-configure_and_make ${gcc_dir}       ${target} "${cpu_options} ${library_options} --enable-languages=c --without-headers"
+configure_and_make ${binutils_dir} ${target}
+if [ -e "${gdb_dir}" ]
+then
+  configure_and_make ${gdb_dir} ${target}
+fi
+configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --enable-languages=c --without-headers"
 
-#sudo mkdir -p ${finaldir}/lib/gcc
-#sudo ln -sr ${finaldir}/dreamcast/lib/gcc/${target} ${finaldir}/lib/gcc/$(target_name ${target})
-#sudo mkdir -p ${finaldir}/libexec/gcc
-#sudo ln -sr ${finaldir}/dreamcast/libexec/gcc/${target} ${finaldir}/libexec/gcc/$(target_name ${target})
-sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${finaldir}/dreamcast/${target}/lib/specs
+sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${installdir}/dreamcast/${target}/lib/specs
 
 echo "\n======= [ Installation complete! ] ======="
 
@@ -797,19 +803,6 @@ exit 0
 #optimizations
 -ffunction-sections
 -fdata-sections
-
-#linker flags
--Wl,-Ttext=0x8c010000
--Wl,--gc-sections
-
-#experimental linker flags
---orphan-handling=discard
--Wl,--gc-sections
--Wl,--entry=0x8c010000
--Wl,--section-start=text=0x8c010000
--Wl,--section-start=ocram=0x7c001000
--Wl,--section-start=stack=0x8c010000
-
 
 # for non-specialized toolchains
 # SH toolchains
