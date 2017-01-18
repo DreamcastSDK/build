@@ -581,11 +581,11 @@ then
   echo -n "\nUninstalling..."
   sudo rm -rf ${installdir}/dreamcast
   echo -n "."
-  sudo rm -rf ${installdir}/bin/sh-dreamcast-*
+  sudo rm -f ${installdir}/bin/sh-dreamcast-*
   echo -n "."
-  sudo rm -rf ${installdir}/bin/sh-elf-${gcc_dir}
+  sudo rm -f ${installdir}/bin/sh-elf-${gcc_dir}
   echo -n "."
-  sudo rm -rf ${installdir}/bin/arm-eabi-${gcc_dir}
+  sudo rm -f ${installdir}/bin/arm-eabi-${gcc_dir}
   echo "."
   echo "\n======= [ Uninstall complete! ] ======="
   exit 0
