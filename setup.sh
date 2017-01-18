@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # The script returns 1 on failure and 0 on success. Failure to delete a
-# pre-existing version when specifying --force is not considered a failure.
+# pre-existing version when specifying --clean is not considered a failure.
 
 
 ################################################################################
@@ -220,9 +220,9 @@ git_tool ()
   branch=$2
   organization=$3
 
-  # If --force is in action and old source exists, attempt delete
+  # If --clean is in action and old source exists, attempt delete
   # If old source exists, delete
-  if ${force}
+  if ${clean}
   then
     if ! rm -rf ${repo} >> ${log} 2>&1
     then
@@ -283,8 +283,8 @@ gnu_download_tool ()
   filename=""
   sha512sum=""
 
-# If --force is in action and old source exists, attempt delete
-  if ${force}
+# If --clean is in action and old source exists, attempt delete
+  if ${clean}
   then
     if ! rm -rf ${target} >> ${log} 2>&1
     then
@@ -504,7 +504,7 @@ download_components()
 ################################################################################
 # Defaults
 uninstall=false
-force=false
+clean=false
 clone=false
 patch=true
 build=true
@@ -530,8 +530,8 @@ until
       build=false
     ;;
 
-    --force)
-      force=true
+    --clean)
+      clean=true
     ;;
 
     --clone)
@@ -557,12 +557,12 @@ until
 
     ?*)
       echo "Usage: ./setup.sh [--uninstall]"
-      echo "                  [--force]"
+      echo "                  [--installdir=<dir>]"
+      echo "                  [--builddir=<dir>]"
+      echo "                  [--clean]"
       echo "                  [--no-patch]"
       echo "                  [--no-build]"
       echo "                  [--clone | --download]"
-      echo "                  [--builddir=<dir>]"
-      echo "                  [--installdir=<dir>]"
       echo "                  [--makejobs=<number>]"
       echo "                  [--help | -h]"
       exit 1
