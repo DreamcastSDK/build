@@ -413,7 +413,7 @@ gnu_download_tool ()
       announce "Applying patches..."
       for patchfile in `ls -1 ${basedir}/patches/*.diff | grep "${target}"`
       do
-        patch --batch --forward --directory=${target} --strip=1 < ${patchfile} >> ${log} 2>&1
+        patch -p1 -N -d ${target} < ${patchfile} >> ${log} 2>&1
       done
     fi
   fi
@@ -672,6 +672,25 @@ then
   log_error "Unable to proceed without the \"tar\" archive tool."
   exit 1
 fi
+
+if ! $(detect "sed")
+then
+  log_error "Unable to proceed without the \"sed\" stream editing tool."
+  exit 1
+fi
+
+if ! $(detect "tee")
+then
+  log_error "Unable to proceed without the \"tee\" tool."
+  exit 1
+fi
+
+if ! $(detect "patch")
+then
+  log_error "Unable to proceed without the \"patch\" tool."
+  exit 1
+fi
+
 
 ################################################################################
 #                                                                              #
