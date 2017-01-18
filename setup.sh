@@ -662,6 +662,13 @@ echo "install dir: ${installdir}"
 echo "C++ compiler: ${CXX}"
 echo "Logging to: ${log}"
 
+
+if ! $(detect "tar")
+then
+  log_error "Unable to proceed without the \"tar\" archive tool."
+  exit 1
+fi
+
 ################################################################################
 #                                                                              #
 #                             Download everything                              #
