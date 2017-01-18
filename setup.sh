@@ -690,6 +690,7 @@ configure_and_make () {
   new_target=$(target_name ${target})
   conf_flags="--prefix=${installdir}
               --exec-prefix=${installdir}/dreamcast
+              --with-gxx-include-dir=${installdir}/dreamcast/${target}/include
               --bindir=${installdir}/bin
               --disable-werror
               --target=${target}
@@ -699,6 +700,7 @@ configure_and_make () {
 
   announce "\n[ ${new_target}-${wd_dir} ]"
   announce "Configuring..."
+  rm -rf ${targetdir} > /dev/null 2>&1
   mkdir -p ${targetdir}
   cd ${targetdir}
   if ! sh ${builddir}/${wd_dir}/configure ${conf_flags} > config.log 2>&1
