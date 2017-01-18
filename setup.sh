@@ -135,7 +135,7 @@ download ()
       ;;
     esac
   else
-    log_error "no download utility found"
+    log_error "No download utility found!"
     return 1
   fi
   return $?
@@ -203,7 +203,7 @@ validate_file () {
   if [ "${checksum}" != "${sha512sum}" ]
   then
     echo "INVALID!"
-    log_error "checksum failure: expected ${sha512sum} but got ${checksum}"
+    log_error "Checksum failure: expected ${sha512sum} but got ${checksum}"
     return 1
   else
     echo "valid."
@@ -307,7 +307,7 @@ gnu_download_tool ()
       filename=`ls ${target}.tar.*`
       if ${validate} && ! validate_file "${filename}" `cat ${target}.sum`
       then
-        log_error "download for ${target} does not match checksum in checksums.txt"
+        log_error "Download for ${target} does not match checksum in checksums.txt"
         return 1
       fi
 
@@ -377,7 +377,7 @@ gnu_download_tool ()
             fi
           ;;
           *)
-            log_error "parsing checksums.txt for ${target} from ${directory}"
+            log_error "Parsing checksums.txt for ${target} from ${directory}"
             return 1
           ;;
         esac
@@ -392,7 +392,7 @@ gnu_download_tool ()
 
       if ${validate} && ! validate_file "${filename}" "${sha512sum}"
       then
-        log_error "download for ${target} does not match checksum in checksums.txt"
+        log_error "Download for ${target} does not match checksum in checksums.txt"
         return 1
       elif ${validate}
       then
