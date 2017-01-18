@@ -619,7 +619,7 @@ elif ${has_gmake}
 then
   make_tool="gmake"
 else
-  log_error "No make system installed!"
+  log_error "No known \"make\" program could be found!"
   exit 1
 fi
 
@@ -629,9 +629,9 @@ then
   export CXX="g++"
 elif $(detect "clang++")
 then
-  export CXX="clang -stdlib=libstdc++"
+  export CXX="clang++ -stdlib=libstdc++"
 else
-  log_error "No C++ compiler was found on this system!"
+  log_error "No known C++ compiler could be found!"
   exit 1
 fi
 
@@ -673,7 +673,7 @@ echo "\n======= [ Downloading components ] ======="
 if ! download_components
 then
   log_error "Failed to download some components"
-  echo "Downloads incomplete - see log for details"
+  echo "Downloads incomplete - see ${log} for details"
   exit 1
 fi
 
@@ -694,7 +694,7 @@ assert_dir "MPFR"     "${mpfr_dir}"
 assert_dir "MPC"      "${mpc_dir}"
 
 # make symlinks for GCC... at least until I figure out the flags to specify their locations
-if ! [ -e ${builddir}/${gcc_dir}/gmp ]
+if [ ! -e ${builddir}/${gcc_dir}/gmp ]
 then
   ln -srf ${builddir}/${gmp_dir}  ${builddir}/${gcc_dir}/gmp
   ln -srf ${builddir}/${mpfr_dir} ${builddir}/${gcc_dir}/mpfr
