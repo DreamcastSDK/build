@@ -1,5 +1,9 @@
 #!/bin/sh
 
+# To modify versions and repos, edit components.conf,  NOT this script
+
+# To see options, run this script with the "--help" argument
+
 # The script returns 1 on failure and 0 on success. Failure to delete a
 # pre-existing version when specifying --clean is not considered a failure.
 
