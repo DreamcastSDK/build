@@ -558,7 +558,6 @@ until
       makejobs=$(arg_value ${opt})
     ;;
 
-
     ?*)
       echo "Usage: ./setup.sh [--uninstall]"
       echo "                  [--installdir=<dir>]"
@@ -683,7 +682,6 @@ elif ! $(detect "patch")
 then
   log_error "Unable to proceed without the \"patch\" tool."
   exit 1
-
 fi
 
 
