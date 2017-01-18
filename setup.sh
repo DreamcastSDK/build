@@ -503,6 +503,7 @@ download_components()
 #                                                                              #
 ################################################################################
 # Defaults
+uninstall=false
 force=false
 clone=false
 patch=true
@@ -517,6 +518,10 @@ installdir="/usr/local"
 until
   opt=$1
   case ${opt} in
+    --uninstall)
+      uninstall=true
+    ;;
+
     --no-patch)
       patch=false
     ;;
@@ -551,7 +556,8 @@ until
 
 
     ?*)
-      echo "Usage: ./setup.sh [--force]"
+      echo "Usage: ./setup.sh [--uninstall]"
+      echo "                  [--force]"
       echo "                  [--no-patch]"
       echo "                  [--no-build]"
       echo "                  [--clone | --download]"
@@ -569,6 +575,21 @@ until
 do
   shift
 done
+
+if ${uninstall}
+then
+  echo -n "\nUninstalling..."
+  sudo rm -rf ${installdir}/dreamcast
+  echo -n "."
+  sudo rm -rf ${installdir}/bin/sh-dreamcast-*
+  echo -n "."
+  sudo rm -rf ${installdir}/bin/sh-elf-${gcc_dir}
+  echo -n "."
+  sudo rm -rf ${installdir}/bin/arm-eabi-${gcc_dir}
+  echo "."
+  echo "\n======= [ Uninstall complete! ] ======="
+  exit 0
+fi
 
 ################################################################################
 #                                                                              #
@@ -657,8 +678,6 @@ then
 fi
 
 echo "\n======= [ Downloads complete! ] ======="
-
-sudo rm -rf ${installdir}/dreamcast ${installdir}/bin/sh-dreamcast-* ${installdir}/bin/sh-elf-${gcc_dir} ${installdir}/bin/arm-eabi-${gcc_dir}
 
 ################################################################################
 #                                                                              #
