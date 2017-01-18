@@ -67,9 +67,9 @@ detect () {
   eval "${1} --version >> /dev/null 2>&1"
   if [ $? -ne 0 ]
   then
-    echo "false"
+    echo false
   fi
-  echo "true"
+  echo true
 }
 
 
@@ -397,7 +397,7 @@ gnu_download_tool ()
       done
     fi
   fi
-  [ "true" ]
+  [ true ]
 }
 
 
@@ -487,10 +487,10 @@ download_components()
 #                                                                              #
 ################################################################################
 # Defaults
-force="false"
-clone="false"
-patch="true"
-build="true"
+force=false
+clone=false
+patch=true
+build=true
 git_transport_prefix="https://github.com"
 gnu_url="ftp://gcc.gnu.org/pub"
 
@@ -503,23 +503,23 @@ until
   opt=$1
   case ${opt} in
     --no-patch)
-      patch="false"
+      patch=false
     ;;
 
     --no-build)
-      build="false"
+      build=false
     ;;
 
     --force)
-      force="true"
+      force=true
     ;;
 
     --clone)
-      clone="true"
+      clone=true
     ;;
 
     --download)
-      clone="false"
+      clone=false
     ;;
 
     --builddir=*)
@@ -742,7 +742,7 @@ export RANLIB_FOR_TARGET=${finaldir}/bin/sh-dreamcast-ranlib
 export READELF_FOR_TARGET=${finaldir}/bin/sh-dreamcast-readelf
 export STRIP_FOR_TARGET=${finaldir}/bin/sh-dreamcast-strip
 
-configure_and_make ${newlib_dir}    ${target} "${cpu_options} --enable-dependency-tracking"
+configure_and_make ${newlib_dir}    ${target} "${cpu_options}"
 
 unset CC_FOR_TARGET
 unset CXX_FOR_TARGET
@@ -756,7 +756,6 @@ unset RANLIB_FOR_TARGET
 unset READELF_FOR_TARGET
 unset STRIP_FOR_TARGET
 
-sudo mkdir -p ${finaldir}/dreamcast/${target}/include/sys
 sudo cp    ${builddir}/kos/common/include/pthread.h      ${finaldir}/dreamcast/${target}/include
 sudo cp    ${builddir}/kos/common/include/sys/_pthread.h ${finaldir}/dreamcast/${target}/include/sys
 sudo cp    ${builddir}/kos/common/include/sys/sched.h    ${finaldir}/dreamcast/${target}/include/sys
