@@ -671,24 +671,19 @@ if ! $(detect "tar")
 then
   log_error "Unable to proceed without the \"tar\" archive tool."
   exit 1
-fi
-
-if ! $(detect "sed")
+elif ! $(detect "sed")
 then
   log_error "Unable to proceed without the \"sed\" stream editing tool."
   exit 1
-fi
-
-if ! $(detect "tee")
+elif ! $(detect "tee")
 then
   log_error "Unable to proceed without the \"tee\" tool."
   exit 1
-fi
-
-if ! $(detect "patch")
+elif ! $(detect "patch")
 then
   log_error "Unable to proceed without the \"patch\" tool."
   exit 1
+
 fi
 
 
