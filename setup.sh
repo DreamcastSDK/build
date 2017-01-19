@@ -600,13 +600,10 @@ then
   echo -n "Download, build and install SDK? [y/N] "
   read doinstall
   case ${doinstall} in
-    y);;
-    Y);;
-    yes);;
-    YES);;
+    [yY]*);;
     *)
       echo "\nAborting installation\n"
-      eval "${0} --help"
+      eval "sh ${0} --help"
       echo ""
       exit 1
     ;;
