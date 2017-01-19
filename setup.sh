@@ -593,9 +593,22 @@ do
   shift
 done
 
+if ${uninstall}
+then
+  echo -n "\nUninstalling..."
+  sudo rm -rf ${installdir}/dreamcast
+  echo -n "."
+  sudo rm -f ${installdir}/bin/sh-dreamcast-*
+  echo -n "."
+  sudo rm -f ${installdir}/bin/sh-elf-${gcc_dir}
+  echo -n "."
+  sudo rm -f ${installdir}/bin/arm-eabi-${gcc_dir}
+  echo "."
+  echo "\n======= [ Uninstall complete! ] ======="
+  exit 0
+fi
 
-
-if ! ${install} && ! ${uninstall}
+if ! ${install}
 then
   echo -n "Download, build and install SDK? [y/N] "
   read doinstall
@@ -611,20 +624,6 @@ then
   esac
 fi
 
-if ${uninstall}
-then
-  echo -n "\nUninstalling..."
-  sudo rm -rf ${installdir}/dreamcast
-  echo -n "."
-  sudo rm -f ${installdir}/bin/sh-dreamcast-*
-  echo -n "."
-  sudo rm -f ${installdir}/bin/sh-elf-${gcc_dir}
-  echo -n "."
-  sudo rm -f ${installdir}/bin/arm-eabi-${gcc_dir}
-  echo "."
-  echo "\n======= [ Uninstall complete! ] ======="
-  exit 0
-fi
 
 ################################################################################
 #                                                                              #
