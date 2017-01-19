@@ -218,6 +218,7 @@ validate_file () {
 # @param[in] $3 The user/organization.
 
 # @return  The result of the underlying call to clone or download a tool.
+has_git=$(detect "git")
 git_tool ()
 {
   repo=$1
@@ -507,6 +508,7 @@ download_components()
 #                                                                              #
 ################################################################################
 # Defaults
+install=false
 uninstall=false
 clean=false
 clone=false
@@ -519,9 +521,14 @@ basedir=$(absolutedir `dirname $0`)
 builddir=$(absolutedir "${basedir}/builds")
 installdir="/usr/local"
 
+
 until
   opt=$1
   case ${opt} in
+    --install)
+      install=true
+    ;;
+
     --uninstall)
       uninstall=true
     ;;
@@ -539,7 +546,13 @@ until
     ;;
 
     --clone)
-      clone=true
+      if ${has_git}
+      then
+        clone=true
+      else
+        echo "You must install \"git\" to use the clone option";
+        exit 1
+      fi
     ;;
 
     --download)
@@ -559,7 +572,8 @@ until
     ;;
 
     ?*)
-      echo "Usage: ./setup.sh [--uninstall]"
+      echo "Usage: ./setup.sh [--install]"
+      echo "                  [--uninstall]"
       echo "                  [--installdir=<dir>]"
       echo "                  [--builddir=<dir>]"
       echo "                  [--clean]"
@@ -578,6 +592,26 @@ until
 do
   shift
 done
+
+
+
+if ! ${install} && ! ${uninstall}
+then
+  echo -n "Download, build and install SDK? [y/N] "
+  read doinstall
+  case ${doinstall} in
+    y);;
+    Y);;
+    yes);;
+    YES);;
+    *)
+      echo "\nAborting installation\n"
+      eval "${0} --help"
+      echo ""
+      exit 1
+    ;;
+  esac
+fi
 
 if ${uninstall}
 then
