@@ -605,7 +605,10 @@ then
   sudo rm -f ${installdir}/bin/arm-eabi-${gcc_dir}
   echo "."
   echo "\n======= [ Uninstall complete! ] ======="
-  exit 0
+  if ! ${install}
+  then
+    exit 0
+  fi
 fi
 
 if ! ${install}
