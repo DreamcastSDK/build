@@ -853,16 +853,11 @@ unset STRIP_FOR_TARGET
 
 
 targetdir=${builddir}/kos
-export PLATFORM=${platform}
-export ARCH=${target}
-export INSTALL_PATH=${installdir}
+environment="-e PLATFORM=${platform} -e ARCH=${target} -e INSTALL_PATH=${installdir}"
 announce "\n[ kos ]"
-step_template ${targetdir} "Installing headers..."  "sudo ${make_tool} install_headers"      "headers.log"
-step_template ${targetdir} "Building..."            "${make_tool} -j${makejobs} ${platform}" "build.log"
-step_template ${targetdir} "Installing..."          "sudo ${make_tool} install"              "install.log"
-unset PLATFORM
-unset ARCH
-unset INSTALL_PATH
+step_template ${targetdir} "Installing headers..."  "sudo ${make_tool} ${environment} install_headers"      "headers.log"
+step_template ${targetdir} "Building..."            "${make_tool} -j${makejobs} ${environment} ${platform}" "build.log"
+step_template ${targetdir} "Installing..."          "sudo ${make_tool} ${environment} install"              "install.log"
 
 configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --enable-languages=c,c++ --enable-threads=kos"
 
