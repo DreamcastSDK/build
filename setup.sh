@@ -229,7 +229,7 @@ git_tool ()
   # If old source exists, delete
   if ${clean}
   then
-    if ! rm -rf ${repo} >> ${log} 2>&1
+    if ! rm -Rf ${repo} >> ${log} 2>&1
     then
       log_warning "Unable to delete old ${tool}"
     fi
@@ -291,7 +291,7 @@ gnu_download_tool ()
 # If --clean is in action and old source exists, attempt delete
   if ${clean}
   then
-    if ! rm -rf ${target} >> ${log} 2>&1
+    if ! rm -Rf ${target} >> ${log} 2>&1
     then
       log_warning "Unable to delete old ${target}"
     fi
@@ -414,7 +414,7 @@ gnu_download_tool ()
       announce "Applying patches..."
       for patchfile in `ls -1 ${basedir}/patches/*.diff | grep "${target}"`
       do
-        patch -p1 -N -d ${target} < ${patchfile} >> ${log} 2>&1
+        patch -p1 -N -d ${target} -i ${patchfile} >> ${log} 2>&1
       done
     fi
   fi
@@ -462,7 +462,7 @@ download_components()
         fi
       ;;
 
-      dreamcast:*)
+      ${platform}:*)
         repo=`  echo ${line} | cut -d ':' -f 2`
         branch=`echo ${line} | cut -d ':' -f 3`
         organization=`  echo ${line} | cut -d ':' -f 4`
@@ -514,6 +514,7 @@ clean=false
 clone=false
 patch=true
 build=true
+platform="dreamcast"
 git_transport_prefix="https://github.com"
 gnu_url="ftp://gcc.gnu.org/pub"
 
@@ -596,9 +597,9 @@ done
 if ${uninstall}
 then
   echo -n "\nUninstalling..."
-  sudo rm -rf ${installdir}/dreamcast
+  sudo rm -Rf ${installdir}/${platform}
   echo -n "."
-  sudo rm -f ${installdir}/bin/sh-dreamcast-*
+  sudo rm -f ${installdir}/bin/${new_target}-*
   echo -n "."
   sudo rm -f ${installdir}/bin/sh-elf-${gcc_dir}
   echo -n "."
@@ -753,9 +754,9 @@ assert_dir "MPC"      "${mpc_dir}"
 # make symlinks for GCC... at least until I figure out the flags to specify their locations
 if [ ! -e ${builddir}/${gcc_dir}/gmp ]
 then
-  ln -srf ${builddir}/${gmp_dir}  ${builddir}/${gcc_dir}/gmp
-  ln -srf ${builddir}/${mpfr_dir} ${builddir}/${gcc_dir}/mpfr
-  ln -srf ${builddir}/${mpc_dir}  ${builddir}/${gcc_dir}/mpc
+  ln -sf ${builddir}/${gmp_dir}  ${builddir}/${gcc_dir}/gmp
+  ln -sf ${builddir}/${mpfr_dir} ${builddir}/${gcc_dir}/mpfr
+  ln -sf ${builddir}/${mpc_dir}  ${builddir}/${gcc_dir}/mpc
 fi
 
 if ! ${build}
@@ -764,49 +765,53 @@ then
   exit 0
 fi
 
-
 target_name () {
-  echo `echo ${1} | cut -d '-' -f 1`-dreamcast
+  echo `echo ${1} | cut -d '-' -f 1`-${platform}
+}
+
+step_template() {
+  dir=${1}
+  message=${2}
+  command=${3}
+  logfile=${4}
+  olddir=`pwd`
+
+  announce ${message}
+  cd ${dir}
+  if ! eval "${command} > ${logfile} 2>&1"
+  then
+    announce "FAILED!\nSee ${dir}${logfile} for details."
+    exit 1
+  fi
+  cd ${olddir}
 }
 
 configure_and_make () {
   wd_dir=${1}
   target=${2}
   new_target=$(target_name ${target})
-  conf_flags="--prefix=${installdir}
-              --exec-prefix=${installdir}/dreamcast
-              --with-gxx-include-dir=${installdir}/dreamcast/${target}/include
-              --bindir=${installdir}/bin
-              --disable-werror
-              --target=${target}
-              --program-prefix=${new_target}-
+  conf_flags="--prefix=${installdir} \
+              --exec-prefix=${installdir}/${platform} \
+              --with-gxx-include-dir=${installdir}/${platform}/${target}/include \
+              --bindir=${installdir}/bin \
+              --disable-werror \
+              --target=${target} \
+              --program-prefix=${new_target}- \
               ${3}"
   targetdir=${builddir}/${new_target}-${wd_dir}
 
   announce "\n[ ${new_target}-${wd_dir} ]"
-  announce "Configuring..."
-  rm -rf ${targetdir} > /dev/null 2>&1
+
+  announce "Initializing..."
+  rm -Rf ${targetdir} > /dev/null 2>&1
   mkdir -p ${targetdir}
-  cd ${targetdir}
-  if ! sh ${builddir}/${wd_dir}/configure ${conf_flags} > config.log 2>&1
-  then
-    announce "FAILED!\nSee ${targetdir}/config.log for details."
-    exit 1
-  fi
-  announce "Building..."
-  if ! eval      "${make_tool} -j${makejobs} > build.log 2>&1"
-  then
-    announce "FAILED!\nSee ${targetdir}/build.log for details."
-    exit 1
-  fi
-  announce "Installing..."
-  if ! eval "sudo ${make_tool} install > install.log 2>&1"
-  then
-    announce "FAILED!\nSee ${targetdir}/install.log for details."
-    exit 1
-  fi
-  cd ${builddir}
-  rm -rf ${targetdir} > /dev/null 2>&1
+
+  step_template ${targetdir} "Configuring..." "sh ${builddir}/${wd_dir}/configure ${conf_flags}" "config.log"
+  step_template ${targetdir} "Building..."    "${make_tool} -j${makejobs}"                       "build.log"
+  step_template ${targetdir} "Installing..."  "sudo ${make_tool} install"                        "install.log"
+
+  announce "Cleaning up..."
+  rm -Rf ${targetdir} > /dev/null 2>&1
 }
 
 library_options="--with-newlib --disable-libssp --disable-tls"
@@ -819,18 +824,18 @@ then
   configure_and_make ${gdb_dir} ${target}
 fi
 configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --enable-languages=c --without-headers"
-
-export CC_FOR_TARGET=${installdir}/bin/sh-dreamcast-gcc
-export CXX_FOR_TARGET=${installdir}/bin/sh-dreamcast-c++
-export GCC_FOR_TARGET=${installdir}/bin/sh-dreamcast-gcc
-export AR_FOR_TARGET=${installdir}/bin/sh-dreamcast-ar
-export AS_FOR_TARGET=${installdir}/bin/sh-dreamcast-as
-export LD_FOR_TARGET=${installdir}/bin/sh-dreamcast-ld
-export NM_FOR_TARGET=${installdir}/bin/sh-dreamcast-nm
-export OBJDUMP_FOR_TARGET=${installdir}/bin/sh-dreamcast-objdump
-export RANLIB_FOR_TARGET=${installdir}/bin/sh-dreamcast-ranlib
-export READELF_FOR_TARGET=${installdir}/bin/sh-dreamcast-readelf
-export STRIP_FOR_TARGET=${installdir}/bin/sh-dreamcast-strip
+new_target=$(target_name ${target})
+export CC_FOR_TARGET=${installdir}/bin/${new_target}-gcc
+export CXX_FOR_TARGET=${installdir}/bin/${new_target}-c++
+export GCC_FOR_TARGET=${installdir}/bin/${new_target}-gcc
+export AR_FOR_TARGET=${installdir}/bin/${new_target}-ar
+export AS_FOR_TARGET=${installdir}/bin/${new_target}-as
+export LD_FOR_TARGET=${installdir}/bin/${new_target}-ld
+export NM_FOR_TARGET=${installdir}/bin/${new_target}-nm
+export OBJDUMP_FOR_TARGET=${installdir}/bin/${new_target}-objdump
+export RANLIB_FOR_TARGET=${installdir}/bin/${new_target}-ranlib
+export READELF_FOR_TARGET=${installdir}/bin/${new_target}-readelf
+export STRIP_FOR_TARGET=${installdir}/bin/${new_target}-strip
 
 configure_and_make ${newlib_dir} ${target} "${cpu_options}"
 
@@ -846,18 +851,24 @@ unset RANLIB_FOR_TARGET
 unset READELF_FOR_TARGET
 unset STRIP_FOR_TARGET
 
-sudo cp    ${builddir}/kos/common/include/pthread.h      ${installdir}/dreamcast/${target}/include
-sudo cp    ${builddir}/kos/common/include/sys/_pthread.h ${installdir}/dreamcast/${target}/include/sys
-sudo cp    ${builddir}/kos/common/include/sys/sched.h    ${installdir}/dreamcast/${target}/include/sys
-sudo cp -r ${builddir}/kos/common/include/kos            ${installdir}/dreamcast/${target}/include
-sudo cp -r ${builddir}/kos/dreamcast/include/arch        ${installdir}/dreamcast/${target}/include
-sudo cp -r ${builddir}/kos/dreamcast/include/dc          ${installdir}/dreamcast/${target}/include
+
+targetdir=${builddir}/kos
+export PLATFORM=${platform}
+export ARCH=${target}
+export INSTALL_PATH=${installdir}
+announce "\n[ kos ]"
+step_template ${targetdir} "Installing headers..."  "sudo ${make_tool} install_headers"      "headers.log"
+step_template ${targetdir} "Building..."            "${make_tool} -j${makejobs} ${platform}" "build.log"
+step_template ${targetdir} "Installing..."          "sudo ${make_tool} install"              "install.log"
+unset PLATFORM
+unset ARCH
+unset INSTALL_PATH
 
 configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --enable-languages=c,c++ --enable-threads=kos"
 
-sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${installdir}/dreamcast/${target}/lib/specs
-sudo rm ${installdir}/dreamcast/${target}/lib/ldscripts/shlelf.*
-sudo cp ${basedir}/scripts/shlelf.x ${installdir}/dreamcast/${target}/lib/ldscripts/
+sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${installdir}/${platform}/${target}/lib/specs
+sudo rm ${installdir}/${platform}/${target}/lib/ldscripts/shlelf.*
+sudo cp ${basedir}/scripts/shlelf.x ${installdir}/${platform}/${target}/lib/ldscripts/
 
 
 target="arm-eabi"
@@ -869,7 +880,7 @@ then
 fi
 configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --enable-languages=c --without-headers"
 
-sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${installdir}/dreamcast/${target}/lib/specs
+sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${installdir}/${platform}/${target}/lib/specs
 
 echo "\n======= [ Installation complete! ] ======="
 
