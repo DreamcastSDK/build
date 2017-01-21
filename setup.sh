@@ -780,7 +780,7 @@ step_template() {
   cd ${dir}
   if ! eval "${command} > ${logfile} 2>&1"
   then
-    announce "FAILED!\nSee ${dir}${logfile} for details."
+    announce "FAILED!\nSee ${dir}/${logfile} for details."
     exit 1
   fi
   cd ${olddir}
