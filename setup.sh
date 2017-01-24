@@ -876,7 +876,7 @@ announce "\n[ kos ]"
 step_template ${targetdir} "Building..."            "${make_tool} -j${makejobs} ${environment} ${platform}" "build.log"
 step_template ${targetdir} "Installing..."          "sudo ${make_tool} ${environment} install"              "install.log"
 
-# </=== BUILD SH4 LIBRARIES ===>
+# </=== BUILD SH4 C LIBRARIES ===>
 
 # <=== REBUILD SH4 COMPILER ===>
 configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --enable-languages=c,c++ --enable-threads=kos"
@@ -905,17 +905,11 @@ LDFLAGS= -ml -m4-single-only -Wl,-Ttext=0x8c010000 -Wl,--gc-sections
 CFLAGS= -mcpu=arm7di -fno-strict-aliasing -Wl,--fix-v4bx -Wa,--fix-v4bx
 AFLAGS= -mcpu=arm7di --fix-v4bx
 
-
+=== Unused KOS Sources ===
 
 # conditional
 common/libc/koslib/crtend.c
 common/libc/koslib/crtbegin.c
-
-# arm
-dreamcast/sound/arm/stream.drv
-dreamcast/sound/arm/main.c
-dreamcast/sound/arm/crt0.s
-dreamcast/sound/arm/aica.c
 
 # extra
 addons/libppp/ppp_scif.c
