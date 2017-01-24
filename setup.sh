@@ -792,7 +792,7 @@ configure_and_make () {
   new_target=$(target_name ${target})
   conf_flags="--prefix=${installdir} \
               --exec-prefix=${installdir}/${platform} \
-              --with-gxx-include-dir=${installdir}/${platform}/${target}/include \
+              --with-gxx-include-dir=${installdir}/${platform}/${target}/include/c++ \
               --bindir=${installdir}/bin \
               --disable-werror \
               --target=${target} \
