@@ -816,6 +816,20 @@ configure_and_make () {
 
 library_options="--with-newlib --disable-libssp --disable-tls"
 
+# <=== BUILD ARM TOOLCHAIN ===>
+target="arm-eabi"
+cpu_options="--with-arch=armv4"
+configure_and_make ${binutils_dir} ${target}
+if [ -e "${gdb_dir}" ]
+then
+  configure_and_make ${gdb_dir} ${target}
+fi
+configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --enable-languages=c --without-headers"
+
+sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${installdir}/${platform}/${target}/lib/specs
+# </=== BUILD ARM TOOLCHAIN ===>
+
+# <=== BUILD SH4 TOOLCHAIN ===>
 target="sh-elf"
 cpu_options="--with-endian=little --with-cpu=m4-single-only --with-multilib-list=m4-single-only,m4-nofpu,m4"
 configure_and_make ${binutils_dir} ${target}
@@ -824,6 +838,13 @@ then
   configure_and_make ${gdb_dir} ${target}
 fi
 configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --enable-languages=c --without-headers"
+
+sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${installdir}/${platform}/${target}/lib/specs
+sudo rm ${installdir}/${platform}/${target}/lib/ldscripts/shlelf.*
+sudo cp ${basedir}/scripts/shlelf.x ${installdir}/${platform}/${target}/lib/ldscripts/
+# </=== BUILD SH4 TOOLCHAIN ===>
+
+# <=== BUILD SH4 C LIBRARIES ===>
 new_target=$(target_name ${target})
 export CC_FOR_TARGET=${installdir}/bin/${new_target}-gcc
 export CXX_FOR_TARGET=${installdir}/bin/${new_target}-c++
@@ -836,9 +857,7 @@ export OBJDUMP_FOR_TARGET=${installdir}/bin/${new_target}-objdump
 export RANLIB_FOR_TARGET=${installdir}/bin/${new_target}-ranlib
 export READELF_FOR_TARGET=${installdir}/bin/${new_target}-readelf
 export STRIP_FOR_TARGET=${installdir}/bin/${new_target}-strip
-
 configure_and_make ${newlib_dir} ${target} "${cpu_options}"
-
 unset CC_FOR_TARGET
 unset CXX_FOR_TARGET
 unset GCC_FOR_TARGET
@@ -851,31 +870,21 @@ unset RANLIB_FOR_TARGET
 unset READELF_FOR_TARGET
 unset STRIP_FOR_TARGET
 
-
 targetdir=${builddir}/kos
 environment="-e PLATFORM=${platform} -e ARCH=${target} -e INSTALL_PATH=${installdir}"
 announce "\n[ kos ]"
-step_template ${targetdir} "Installing headers..."  "sudo ${make_tool} ${environment} install_headers"      "headers.log"
 step_template ${targetdir} "Building..."            "${make_tool} -j${makejobs} ${environment} ${platform}" "build.log"
 step_template ${targetdir} "Installing..."          "sudo ${make_tool} ${environment} install"              "install.log"
 
+# </=== BUILD SH4 LIBRARIES ===>
+
+# <=== REBUILD SH4 COMPILER ===>
 configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --enable-languages=c,c++ --enable-threads=kos"
 
 sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${installdir}/${platform}/${target}/lib/specs
 sudo rm ${installdir}/${platform}/${target}/lib/ldscripts/shlelf.*
 sudo cp ${basedir}/scripts/shlelf.x ${installdir}/${platform}/${target}/lib/ldscripts/
-
-
-target="arm-eabi"
-cpu_options="--with-arch=armv4"
-configure_and_make ${binutils_dir} ${target}
-if [ -e "${gdb_dir}" ]
-then
-  configure_and_make ${gdb_dir} ${target}
-fi
-configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --enable-languages=c --without-headers"
-
-sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${installdir}/${platform}/${target}/lib/specs
+# </=== REBUILD SH4 COMPILER ===>
 
 echo "\n======= [ Installation complete! ] ======="
 
@@ -895,3 +904,112 @@ LDFLAGS= -ml -m4-single-only -Wl,-Ttext=0x8c010000 -Wl,--gc-sections
 # ARM toolchains
 CFLAGS= -mcpu=arm7di -fno-strict-aliasing -Wl,--fix-v4bx -Wa,--fix-v4bx
 AFLAGS= -mcpu=arm7di --fix-v4bx
+
+
+
+# conditional
+common/libc/koslib/crtend.c
+common/libc/koslib/crtbegin.c
+
+# arm
+dreamcast/sound/arm/stream.drv
+dreamcast/sound/arm/main.c
+dreamcast/sound/arm/crt0.s
+dreamcast/sound/arm/aica.c
+
+# extra
+addons/libppp/ppp_scif.c
+addons/libppp/ppp_modem.c
+addons/libkosutils/img.c
+addons/libkosutils/netcfg.c
+addons/libkosutils/md5.c
+addons/libkosutils/pcx_small.c
+addons/libkosutils/bspline.c
+common/thread/recursive_lock.c
+common/thread/rwsem.c
+common/thread/tls.c
+common/thread/thread.c
+common/thread/once.c
+common/net/net_crc.c
+common/net/net_icmp6.c
+common/net/net_core.c
+common/net/net_thd.c
+common/net/net_dhcp.c
+common/net/net_tcp.c
+common/net/net_ndp.c
+common/net/net_multicast.c
+common/net/net_input.c
+common/net/net_icmp.c
+common/net/net_ipv4.c
+common/net/net_udp.c
+common/net/net_ipv6.c
+common/net/net_arp.c
+common/net/net_ipv4_frag.c
+common/fs/fs_utils.c
+common/fs/elf.c
+common/fs/fs_socket.c
+dreamcast/navi/navi_flash.c
+dreamcast/navi/navi_ide.c
+dreamcast/hardware/spu.c
+dreamcast/hardware/scif.c
+dreamcast/hardware/pvr/pvr_irq.c
+dreamcast/hardware/pvr/pvr_misc.c
+dreamcast/hardware/pvr/pvr_prim.c
+dreamcast/hardware/pvr/pvr_buffers.c
+dreamcast/hardware/pvr/pvr_init_shutdown.c
+dreamcast/hardware/pvr/pvr_globals.c
+dreamcast/hardware/pvr/pvr_texture.c
+dreamcast/hardware/pvr/pvr_fog.c
+dreamcast/hardware/pvr/pvr_scene.c
+dreamcast/hardware/pvr/pvr_palette.c
+dreamcast/hardware/pvr/pvr_mem_core.c
+dreamcast/hardware/pvr/pvr_mem.c
+dreamcast/hardware/pvr/pvr_dma.c
+dreamcast/hardware/g2bus.c
+dreamcast/hardware/vblank.c
+dreamcast/hardware/maple
+dreamcast/hardware/maple/controller.c
+dreamcast/hardware/maple/vmu.c
+dreamcast/hardware/maple/maple_utils.c
+dreamcast/hardware/maple/maple_driver.c
+dreamcast/hardware/maple/lightgun.c
+dreamcast/hardware/maple/maple_queue.c
+dreamcast/hardware/maple/sip.c
+dreamcast/hardware/maple/maple_enum.c
+dreamcast/hardware/maple/keyboard.c
+dreamcast/hardware/maple/purupuru.c
+dreamcast/hardware/maple/maple_globals.c
+dreamcast/hardware/maple/dreameye.c
+dreamcast/hardware/maple/maple_irq.c
+dreamcast/hardware/maple/mouse.c
+dreamcast/hardware/maple/maple_init_shutdown.c
+dreamcast/hardware/asic.c
+dreamcast/hardware/modem
+dreamcast/hardware/scif-spi.c
+dreamcast/hardware/biosfont.c
+dreamcast/hardware/sd.c
+dreamcast/hardware/video.c
+dreamcast/hardware/flashrom.c
+dreamcast/hardware/network
+dreamcast/hardware/sq.c
+dreamcast/hardware/cdrom.c
+dreamcast/hardware/spudma.c
+dreamcast/hardware/g1ata.c
+dreamcast/kernel/init_romdisk_default.c
+dreamcast/kernel/init_flags_default.c
+dreamcast/kernel/rtc.c
+dreamcast/kernel/exec.c
+dreamcast/kernel/itlb.s
+dreamcast/kernel/ser_console.c
+dreamcast/kernel/timer.c
+dreamcast/kernel/execasm.s
+dreamcast/kernel/stack.c
+dreamcast/kernel/gdb_stub.c
+dreamcast/kernel/mmu.c
+dreamcast/kernel/thdswitch.s
+dreamcast/fs/dcload-syscall.s
+dreamcast/fs/fs_vmu.c
+dreamcast/fs/fs_dclsocket.c
+dreamcast/fs/fs_dcload.c
+dreamcast/fs/vmufs.c
+dreamcast/fs/fs_iso9660.c
