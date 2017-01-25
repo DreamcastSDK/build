@@ -515,6 +515,12 @@ clean=false
 clone=false
 patch=true
 build=true
+build_arm_c_toolchain=true
+build_sh4_c_toolchain=true
+build_sh4_libc=true
+build_sh4_cpp_compiler=true
+build_libraries=true
+
 platform="dreamcast"
 git_transport_prefix="https://github.com"
 gnu_url="ftp://gcc.gnu.org/pub"
@@ -799,94 +805,125 @@ configure_and_make () {
               --target=${target} \
               --program-prefix=${new_target}- \
               ${3}"
-  targetdir=${builddir}/${new_target}-${wd_dir}
+  compilation_dir=${builddir}/${new_target}-${wd_dir}
 
   announce "\n[ ${new_target}-${wd_dir} ]"
 
   announce "Initializing..."
-  rm -Rf ${targetdir} > /dev/null 2>&1
-  mkdir -p ${targetdir}
+  rm -Rf ${compilation_dir} > /dev/null 2>&1
+  mkdir -p ${compilation_dir}
 
-  step_template ${targetdir} "Configuring..." "sh ${builddir}/${wd_dir}/configure ${conf_flags}" "config.log"
-  step_template ${targetdir} "Building..."    "${make_tool} -j${makejobs}"                       "build.log"
-  step_template ${targetdir} "Installing..."  "sudo ${make_tool} install"                        "install.log"
+  step_template ${compilation_dir} "Configuring..." "sh ${builddir}/${wd_dir}/configure ${conf_flags}" "config.log"
+  step_template ${compilation_dir} "Building..."    "${make_tool} -j${makejobs}"                       "build.log"
+  step_template ${compilation_dir} "Installing..."  "sudo ${make_tool} install"                        "install.log"
 
   announce "Cleaning up..."
-  rm -Rf ${targetdir} > /dev/null 2>&1
+  rm -Rf ${compilation_dir} > /dev/null 2>&1
 }
 
+# === FOR ALL TARGETS ===
 library_options="--with-newlib --disable-libssp --disable-tls"
 
-# <=== BUILD ARM C TOOLCHAIN ===>
+# === ARM TARGET ===
 target="arm-eabi"
+target_dir=${installdir}/${platform}/${target}
 cpu_options="--with-arch=armv4"
-configure_and_make ${binutils_dir} ${target}
-if [ -e "${gdb_dir}" ]
-then
-  configure_and_make ${gdb_dir} ${target}
-fi
-configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --enable-languages=c --without-headers"
 
-sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${installdir}/${platform}/${target}/lib/specs
+# <=== BUILD ARM C TOOLCHAIN ===>
+if ${build_arm_c_toolchain}
+then
+  configure_and_make ${binutils_dir} ${target}
+  if [ -e "${gdb_dir}" ]
+  then
+    configure_and_make ${gdb_dir} ${target}
+  fi
+  configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --enable-languages=c --without-headers"
+
+  sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${target_dir}/lib/specs
+fi
 # </=== BUILD ARM C TOOLCHAIN ===>
 
-# <=== BUILD SH4 C TOOLCHAIN ===>
+# === SH4 TARGET ===
 target="sh-elf"
+target_dir=${installdir}/${platform}/${target}
 cpu_options="--with-endian=little --with-cpu=m4-single-only --with-multilib-list=m4-single-only,m4-nofpu,m4"
-configure_and_make ${binutils_dir} ${target}
-if [ -e "${gdb_dir}" ]
-then
-  configure_and_make ${gdb_dir} ${target}
-fi
-configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --enable-languages=c --without-headers"
 
-sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${installdir}/${platform}/${target}/lib/specs
-sudo rm ${installdir}/${platform}/${target}/lib/ldscripts/shlelf.*
-sudo cp ${basedir}/scripts/shlelf.x ${installdir}/${platform}/${target}/lib/ldscripts/
+# <=== BUILD SH4 C TOOLCHAIN ===>
+if ${build_sh4_c_toolchain}
+then
+  configure_and_make ${binutils_dir} ${target}
+  if [ -e "${gdb_dir}" ]
+  then
+    configure_and_make ${gdb_dir} ${target}
+  fi
+  configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --enable-languages=c --without-headers"
+
+  sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${target_dir}/lib/specs
+  sudo rm ${target_dir}/lib/ldscripts/shlelf.*
+  sudo cp ${basedir}/scripts/shlelf.x ${target_dir}/lib/ldscripts/
+fi
 # </=== BUILD SH4 C COMPILER ===>
 
 # <=== BUILD SH4 LIB C ===>
-target_prefix=${installdir}/bin/$(target_name ${target})
-export CC_FOR_TARGET=${target_prefix}-gcc
-export CXX_FOR_TARGET=${target_prefix}-c++
-export GCC_FOR_TARGET=${target_prefix}-gcc
-export AR_FOR_TARGET=${target_prefix}-ar
-export AS_FOR_TARGET=${target_prefix}-as
-export LD_FOR_TARGET=${target_prefix}-ld
-export NM_FOR_TARGET=${target_prefix}-nm
-export OBJDUMP_FOR_TARGET=${target_prefix}-objdump
-export RANLIB_FOR_TARGET=${target_prefix}-ranlib
-export READELF_FOR_TARGET=${target_prefix}-readelf
-export STRIP_FOR_TARGET=${target_prefix}-strip
-configure_and_make ${newlib_dir} ${target} "${cpu_options}"
-unset CC_FOR_TARGET
-unset CXX_FOR_TARGET
-unset GCC_FOR_TARGET
-unset AR_FOR_TARGET
-unset AS_FOR_TARGET
-unset LD_FOR_TARGET
-unset NM_FOR_TARGET
-unset OBJDUMP_FOR_TARGET
-unset RANLIB_FOR_TARGET
-unset READELF_FOR_TARGET
-unset STRIP_FOR_TARGET
+if ${build_sh4_libc}
+then
+  target_prefix=${installdir}/bin/$(target_name ${target})
+  export CC_FOR_TARGET=${target_prefix}-gcc
+  export CXX_FOR_TARGET=${target_prefix}-c++
+  export GCC_FOR_TARGET=${target_prefix}-gcc
+  export AR_FOR_TARGET=${target_prefix}-ar
+  export AS_FOR_TARGET=${target_prefix}-as
+  export LD_FOR_TARGET=${target_prefix}-ld
+  export NM_FOR_TARGET=${target_prefix}-nm
+  export OBJDUMP_FOR_TARGET=${target_prefix}-objdump
+  export RANLIB_FOR_TARGET=${target_prefix}-ranlib
+  export READELF_FOR_TARGET=${target_prefix}-readelf
+  export STRIP_FOR_TARGET=${target_prefix}-strip
+  configure_and_make ${newlib_dir} ${target} "${cpu_options}"
+  unset CC_FOR_TARGET
+  unset CXX_FOR_TARGET
+  unset GCC_FOR_TARGET
+  unset AR_FOR_TARGET
+  unset AS_FOR_TARGET
+  unset LD_FOR_TARGET
+  unset NM_FOR_TARGET
+  unset OBJDUMP_FOR_TARGET
+  unset RANLIB_FOR_TARGET
+  unset READELF_FOR_TARGET
+  unset STRIP_FOR_TARGET
+fi
 # </=== BUILD SH4 LIB C ===>
 
 # <=== BUILD SH4 C++ COMPILER ===>
-configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --enable-languages=c,c++ --enable-threads=kos"
+if ${build_sh4_cpp_compiler}
+then
+  assert_dir "KOS" "${kos_dir}"
+  sudo mkdir -p ${target_dir}/include/kos
+  sudo mkdir -p ${target_dir}/include/sys
+  sudo cp -R ${kos_dir}/common/include/kos           ${target_dir}/include/
+  sudo cp -R ${kos_dir}/${platform}/include/*        ${target_dir}/include/
+  sudo cp ${kos_dir}/common/include/pthread.h        ${target_dir}/include/
+  sudo cp ${kos_dir}/common/include/sys/_pthread.h   ${target_dir}/include/sys/
+  sudo cp ${kos_dir}/common/include/sys/sched.h      ${target_dir}/include/sys/
 
-sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${installdir}/${platform}/${target}/lib/specs
-sudo rm ${installdir}/${platform}/${target}/lib/ldscripts/shlelf.*
-sudo cp ${basedir}/scripts/shlelf.x ${installdir}/${platform}/${target}/lib/ldscripts/
+  configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --enable-languages=c,c++ --enable-threads=kos"
+
+  sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${target_dir}/lib/specs
+  sudo rm ${target_dir}/lib/ldscripts/shlelf.*
+  sudo cp ${basedir}/scripts/shlelf.x ${target_dir}/lib/ldscripts/
+fi
 # </=== BUILD SH4 C++ COMPILER ===>
 
 # <=== BUILD LIBRARIES ===>
-if [ -e "${kos_dir}" ]
+if ${build_libraries}
 then
-  environment="-e PLATFORM=${platform} -e ARCH=${target} -e INSTALL_PATH=${installdir} -e DEBUG=true"
-  announce "\n[ kos ]"
-  step_template "${builddir}/${kos_dir}" "Building..."   "${make_tool} -j${makejobs} ${environment}" "build.log"
-  step_template "${builddir}/${kos_dir}" "Installing..." "sudo ${make_tool} ${environment} install"  "install.log"
+  if [ -e "${kos_dir}" ]
+  then
+    environment="-e PLATFORM=${platform} -e ARCH=${target} -e INSTALL_PATH=${installdir}"
+    announce "\n[ kos ]"
+    step_template "${builddir}/${kos_dir}" "Building..."   "${make_tool} -j${makejobs} ${environment}" "build.log"
+    step_template "${builddir}/${kos_dir}" "Installing..." "sudo ${make_tool} ${environment} install"  "install.log"
+  fi
 fi
 # </=== BUILD LIBRARIES ===>
 
