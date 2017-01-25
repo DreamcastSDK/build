@@ -878,7 +878,6 @@ then
   step_template ${kos_dir} "Building..."   "${make_tool} -j${makejobs} ${environment} ${platform}" "build.log"
   step_template ${kos_dir} "Installing..." "sudo ${make_tool} ${environment} install"              "install.log"
 fi
-
 # </=== BUILD SH4 C LIBRARIES ===>
 
 # <=== REBUILD SH4 COMPILER ===>
