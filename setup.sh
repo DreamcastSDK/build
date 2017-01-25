@@ -817,7 +817,7 @@ configure_and_make () {
 
 library_options="--with-newlib --disable-libssp --disable-tls"
 
-# <=== BUILD ARM TOOLCHAIN ===>
+# <=== BUILD ARM C TOOLCHAIN ===>
 target="arm-eabi"
 cpu_options="--with-arch=armv4"
 configure_and_make ${binutils_dir} ${target}
@@ -828,9 +828,9 @@ fi
 configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --enable-languages=c --without-headers"
 
 sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${installdir}/${platform}/${target}/lib/specs
-# </=== BUILD ARM TOOLCHAIN ===>
+# </=== BUILD ARM C TOOLCHAIN ===>
 
-# <=== BUILD SH4 TOOLCHAIN ===>
+# <=== BUILD SH4 C TOOLCHAIN ===>
 target="sh-elf"
 cpu_options="--with-endian=little --with-cpu=m4-single-only --with-multilib-list=m4-single-only,m4-nofpu,m4"
 configure_and_make ${binutils_dir} ${target}
@@ -843,9 +843,9 @@ configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --ena
 sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${installdir}/${platform}/${target}/lib/specs
 sudo rm ${installdir}/${platform}/${target}/lib/ldscripts/shlelf.*
 sudo cp ${basedir}/scripts/shlelf.x ${installdir}/${platform}/${target}/lib/ldscripts/
-# </=== BUILD SH4 TOOLCHAIN ===>
+# </=== BUILD SH4 C COMPILER ===>
 
-# <=== BUILD SH4 C LIBRARIES ===>
+# <=== BUILD SH4 LIB C ===>
 target_prefix=${installdir}/bin/$(target_name ${target})
 export CC_FOR_TARGET=${target_prefix}-gcc
 export CXX_FOR_TARGET=${target_prefix}-c++
@@ -870,23 +870,25 @@ unset OBJDUMP_FOR_TARGET
 unset RANLIB_FOR_TARGET
 unset READELF_FOR_TARGET
 unset STRIP_FOR_TARGET
+# </=== BUILD SH4 LIB C ===>
 
-if [ -e "${kos_dir}" ]
-then
-  environment="-e PLATFORM=${platform} -e ARCH=${target} -e INSTALL_PATH=${installdir}"
-  announce "\n[ kos ]"
-  step_template ${kos_dir} "Building..."   "${make_tool} -j${makejobs} ${environment} ${platform}" "build.log"
-  step_template ${kos_dir} "Installing..." "sudo ${make_tool} ${environment} install"              "install.log"
-fi
-# </=== BUILD SH4 C LIBRARIES ===>
-
-# <=== REBUILD SH4 COMPILER ===>
+# <=== BUILD SH4 C++ COMPILER ===>
 configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --enable-languages=c,c++ --enable-threads=kos"
 
 sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${installdir}/${platform}/${target}/lib/specs
 sudo rm ${installdir}/${platform}/${target}/lib/ldscripts/shlelf.*
 sudo cp ${basedir}/scripts/shlelf.x ${installdir}/${platform}/${target}/lib/ldscripts/
-# </=== REBUILD SH4 COMPILER ===>
+# </=== BUILD SH4 C++ COMPILER ===>
+
+# <=== BUILD LIBRARIES ===>
+if [ -e "${kos_dir}" ]
+then
+  environment="-e PLATFORM=${platform} -e ARCH=${target} -e INSTALL_PATH=${installdir} -e DEBUG=true"
+  announce "\n[ kos ]"
+  step_template "${builddir}/${kos_dir}" "Building..."   "${make_tool} -j${makejobs} ${environment}" "build.log"
+  step_template "${builddir}/${kos_dir}" "Installing..." "sudo ${make_tool} ${environment} install"  "install.log"
+fi
+# </=== BUILD LIBRARIES ===>
 
 echo "\n======= [ Installation complete! ] ======="
 
