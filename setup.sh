@@ -720,12 +720,11 @@ elif ! $(detect "tee")
 then
   log_error "Unable to proceed without the \"tee\" tool."
   exit 1
-elif ! $(detect "patch")
+elif ! $(detect "patch") && ${patch}
 then
   log_error "Unable to proceed without the \"patch\" tool."
   exit 1
 fi
-
 
 ################################################################################
 #                                                                              #
