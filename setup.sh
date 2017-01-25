@@ -224,6 +224,7 @@ git_tool ()
   repo=$1
   branch=$2
   organization=$3
+  eval "`echo ${repo} | sed -e "s/[^0-9a-zA-Z]/_/g"`_dir=${repo}"
 
   # If --clean is in action and old source exists, attempt delete
   # If old source exists, delete
@@ -278,7 +279,7 @@ gnu_download_tool ()
   version=$2
   target=${tool}-${version}
   urlbase=$3
-  eval "${tool}_dir=${target}"
+  eval "`echo ${tool} | sed -e "s/[^0-9a-zA-Z]/_/g"`_dir=${target}"
 
   if [ "x${urlbase}" = "x" ]
   then
@@ -599,7 +600,7 @@ then
   echo -n "\nUninstalling..."
   sudo rm -Rf ${installdir}/${platform}
   echo -n "."
-  sudo rm -f ${installdir}/bin/${new_target}-*
+  sudo rm -f ${installdir}/bin/*-${platform}-*
   echo -n "."
   sudo rm -f ${installdir}/bin/sh-elf-${gcc_dir}
   echo -n "."
@@ -744,12 +745,12 @@ echo "\n======= [ Downloads complete! ] ======="
 ################################################################################
 echo "\n======= [ Configuring, building, installing ] ======="
 
-assert_dir "Binutils" "${binutils_dir}"
-assert_dir "GCC"      "${gcc_dir}"
-assert_dir "Newlib"   "${newlib_dir}"
-assert_dir "GMP"      "${gmp_dir}"
-assert_dir "MPFR"     "${mpfr_dir}"
-assert_dir "MPC"      "${mpc_dir}"
+assert_dir "Binutils"   "${binutils_dir}"
+assert_dir "GCC"        "${gcc_dir}"
+assert_dir "Newlib"     "${newlib_dir}"
+assert_dir "GMP"        "${gmp_dir}"
+assert_dir "MPFR"       "${mpfr_dir}"
+assert_dir "MPC"        "${mpc_dir}"
 
 # make symlinks for GCC... at least until I figure out the flags to specify their locations
 if [ ! -e ${builddir}/${gcc_dir}/gmp ]
@@ -845,18 +846,18 @@ sudo cp ${basedir}/scripts/shlelf.x ${installdir}/${platform}/${target}/lib/ldsc
 # </=== BUILD SH4 TOOLCHAIN ===>
 
 # <=== BUILD SH4 C LIBRARIES ===>
-new_target=$(target_name ${target})
-export CC_FOR_TARGET=${installdir}/bin/${new_target}-gcc
-export CXX_FOR_TARGET=${installdir}/bin/${new_target}-c++
-export GCC_FOR_TARGET=${installdir}/bin/${new_target}-gcc
-export AR_FOR_TARGET=${installdir}/bin/${new_target}-ar
-export AS_FOR_TARGET=${installdir}/bin/${new_target}-as
-export LD_FOR_TARGET=${installdir}/bin/${new_target}-ld
-export NM_FOR_TARGET=${installdir}/bin/${new_target}-nm
-export OBJDUMP_FOR_TARGET=${installdir}/bin/${new_target}-objdump
-export RANLIB_FOR_TARGET=${installdir}/bin/${new_target}-ranlib
-export READELF_FOR_TARGET=${installdir}/bin/${new_target}-readelf
-export STRIP_FOR_TARGET=${installdir}/bin/${new_target}-strip
+target_prefix=${installdir}/bin/$(target_name ${target})
+export CC_FOR_TARGET=${target_prefix}-gcc
+export CXX_FOR_TARGET=${target_prefix}-c++
+export GCC_FOR_TARGET=${target_prefix}-gcc
+export AR_FOR_TARGET=${target_prefix}-ar
+export AS_FOR_TARGET=${target_prefix}-as
+export LD_FOR_TARGET=${target_prefix}-ld
+export NM_FOR_TARGET=${target_prefix}-nm
+export OBJDUMP_FOR_TARGET=${target_prefix}-objdump
+export RANLIB_FOR_TARGET=${target_prefix}-ranlib
+export READELF_FOR_TARGET=${target_prefix}-readelf
+export STRIP_FOR_TARGET=${target_prefix}-strip
 configure_and_make ${newlib_dir} ${target} "${cpu_options}"
 unset CC_FOR_TARGET
 unset CXX_FOR_TARGET
@@ -870,11 +871,13 @@ unset RANLIB_FOR_TARGET
 unset READELF_FOR_TARGET
 unset STRIP_FOR_TARGET
 
-targetdir=${builddir}/kos
-environment="-e PLATFORM=${platform} -e ARCH=${target} -e INSTALL_PATH=${installdir}"
-announce "\n[ kos ]"
-step_template ${targetdir} "Building..."            "${make_tool} -j${makejobs} ${environment} ${platform}" "build.log"
-step_template ${targetdir} "Installing..."          "sudo ${make_tool} ${environment} install"              "install.log"
+if [ -e "${kos_dir}" ]
+then
+  environment="-e PLATFORM=${platform} -e ARCH=${target} -e INSTALL_PATH=${installdir}"
+  announce "\n[ kos ]"
+  step_template ${kos_dir} "Building..."   "${make_tool} -j${makejobs} ${environment} ${platform}" "build.log"
+  step_template ${kos_dir} "Installing..." "sudo ${make_tool} ${environment} install"              "install.log"
+fi
 
 # </=== BUILD SH4 C LIBRARIES ===>
 
