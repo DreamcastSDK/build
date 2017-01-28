@@ -15,9 +15,9 @@
 ################################################################################
 
 # Function to print to stdout and log
-# @param[in] $1 message
+# @param[in] $@ message
 announce () {
-  echo "${1}" | tee -a ${log}
+  echo "${@}" | tee -a ${log}
 }
 
 # Function to record error to log
@@ -476,9 +476,9 @@ gnu_download_tool ()
 
     if ${patch}
     then
-      announce "Applying patches..."
       for patchfile in $(ls -1 ${basedir}/patches/*.diff | grep "${target}")
       do
+        announce "Applying patch ${patchfile}..."
         patch -p1 -N -d ${target} -i ${patchfile} >> ${log} 2>&1
       done
     fi
@@ -616,6 +616,9 @@ usage=$(concat \
       "\n                  [--no-libraries]" \
       "\n                  [--help | -h]" \
       )
+help=$(concat \
+      "\n TODO: make help string" \
+      )
 
 until [ "x$1" = "x" ]
 do
@@ -697,6 +700,7 @@ do
 
     -h|--help)
       echo "${usage}"
+      echo "${help}"
       exit 0
     ;;
     ?*)
@@ -811,7 +815,6 @@ then
 fi
 
 # Set up a log file
-#log="${builddir}/build-$(date +%F-%H%M).log"
 log="${builddir}/build.log"
 rm -f "${log}"
 
@@ -892,7 +895,7 @@ step_template() {
   logfile=${4}
   olddir=$(pwd)
 
-  announce ${message}
+  announce "${message}"
   cd ${dir}
   if ! eval "${command} > ${logfile} 2>&1"
   then
@@ -941,12 +944,12 @@ cpu_options="--with-arch=armv4"
 # <=== BUILD ARM C TOOLCHAIN ===>
 if ${build_arm_c_toolchain}
 then
-  configure_and_make ${binutils_dir} ${target}
+  configure_and_make "${binutils_dir}" "${target}"
   if [ -e "${gdb_dir}" ]
   then
-    configure_and_make ${gdb_dir} ${target}
+    configure_and_make "${gdb_dir}" "${target}"
   fi
-  configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --enable-languages=c --without-headers"
+  configure_and_make "${gcc_dir}" "${target}" "${cpu_options} ${library_options} --enable-languages=c --without-headers"
 
   sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${target_dir}/lib/specs
 fi
@@ -960,12 +963,12 @@ cpu_options="--with-endian=little --with-cpu=m4-single-only --with-multilib-list
 # <=== BUILD SH4 C TOOLCHAIN ===>
 if ${build_sh4_c_toolchain}
 then
-  configure_and_make ${binutils_dir} ${target}
+  configure_and_make "${binutils_dir}" "${target}"
   if [ -e "${gdb_dir}" ]
   then
-    configure_and_make ${gdb_dir} ${target}
+    configure_and_make "${gdb_dir}" "${target}"
   fi
-  configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --enable-languages=c --without-headers"
+  configure_and_make "${gcc_dir}" "${target}" "${cpu_options} ${library_options} --enable-languages=c --without-headers"
 
   sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${target_dir}/lib/specs
   sudo rm ${target_dir}/lib/ldscripts/shlelf.*
@@ -988,7 +991,7 @@ then
   export RANLIB_FOR_TARGET=${target_prefix}-ranlib
   export READELF_FOR_TARGET=${target_prefix}-readelf
   export STRIP_FOR_TARGET=${target_prefix}-strip
-  configure_and_make ${newlib_dir} ${target} "${cpu_options}"
+  configure_and_make "${newlib_dir}" "${target}" "${cpu_options}"
   unset CC_FOR_TARGET
   unset CXX_FOR_TARGET
   unset GCC_FOR_TARGET
@@ -1011,7 +1014,7 @@ then
   assert_dir "KOS" "${kos_dir}"
   step_template "${builddir}/${kos_dir}" "Installing headers to build SH4 C++ compiler." "sudo ${make_tool} ${environment} install_headers"  "install_headers.log"
 
-  configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --enable-languages=c,c++ --enable-threads=kos"
+  configure_and_make "${gcc_dir}" "${target}" "${cpu_options} ${library_options} --enable-languages=c,c++ --enable-threads=kos"
 
   sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${target_dir}/lib/specs
   sudo rm ${target_dir}/lib/ldscripts/shlelf.*
