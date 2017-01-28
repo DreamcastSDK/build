@@ -32,6 +32,16 @@ log_warning () {
   announce "WARNING: ${1}"
 }
 
+# Function concatonate strings into a single string
+# @param[in] $@ input strings
+concat () {
+  until [ "x${1}" = "x" ]
+  do
+    echo -n "${1}"
+    shift
+  done
+}
+
 # Function to extract value from argument
 # @param[in] $1 input string e.g. --flagname=value
 arg_value () {
@@ -574,20 +584,11 @@ clean=false
 clone=false
 patch=true
 build=true
-if true
-then
 build_arm_c_toolchain=true
 build_sh4_c_toolchain=true
 build_sh4_libc=true
 build_sh4_cpp_compiler=true
 build_libraries=true
-else
-build_arm_c_toolchain=false
-build_sh4_c_toolchain=false
-build_sh4_libc=false
-build_sh4_cpp_compiler=false
-build_libraries=true
-fi
 
 platform="dreamcast"
 git_transport_prefix="https://github.com"
@@ -598,10 +599,28 @@ builddir=$(absolutedir "${basedir}/builds")
 installdir="/usr/local"
 libraries=""
 
+usage=$(concat \
+      "\nUsage: ./setup.sh [--install]" \
+      "\n                  [--uninstall]" \
+      "\n                  [--installdir=<dir>]" \
+      "\n                  [--builddir=<dir>]" \
+      "\n                  [--clean]" \
+      "\n                  [--clone | --download]" \
+      "\n                  [--makejobs=<number>]" \
+      "\n                  [--no-patch]" \
+      "\n                  [--no-build]" \
+      "\n                  [--no-arm-toolchain]" \
+      "\n                  [--no-sh4-toolchain]" \
+      "\n                  [--no-sh4-libc]" \
+      "\n                  [--no-sh4-c++]" \
+      "\n                  [--no-libraries]" \
+      "\n                  [--help | -h]" \
+      )
+
 until [ "x$1" = "x" ]
 do
-  opt=$1
-  case ${opt} in
+  option=$1
+  case ${option} in
     --install)
       install=true
     ;;
@@ -610,12 +629,12 @@ do
       uninstall=true
     ;;
 
-    --no-patch)
-      patch=false
+    --installdir=*)
+      installdir=$(absolutedir $(arg_value ${option}))
     ;;
 
-    --no-build)
-      build=false
+    --builddir=*)
+      builddir=$(absolutedir $(arg_value ${option}))
     ;;
 
     --clean)
@@ -636,29 +655,54 @@ do
       clone=false
     ;;
 
-    --builddir=*)
-      builddir=$(absolutedir $(arg_value ${opt}))
-    ;;
-
-    --installdir=*)
-      installdir=$(absolutedir $(arg_value ${opt}))
-    ;;
-
     --makejobs=*)
-      makejobs=$(arg_value ${opt})
+      makejobs=$(arg_value ${option})
     ;;
 
+
+    --no-patch)
+      patch=false
+    ;;
+
+    --no-build)
+      build_arm_c_toolchain=false
+      build_sh4_c_toolchain=false
+      build_sh4_libc=false
+      build_sh4_cpp_compiler=false
+      build_libraries=false
+    ;;
+
+    --no-arm-toolchain)
+      build_arm_c_toolchain=false
+    ;;
+
+    --no-sh4-toolchain)
+      build_sh4_c_toolchain=false
+      build_sh4_libc=false
+      build_sh4_cpp_compiler=false
+    ;;
+
+    --no-sh4-libc)
+      build_sh4_libc=false
+      build_sh4_cpp_compiler=false
+    ;;
+
+    --no-sh4-c++)
+      build_sh4_cpp_compiler=false
+    ;;
+
+    --no-libraries)
+      build_libraries=false
+    ;;
+
+    -h|--help)
+      echo "${usage}"
+      exit 0
+    ;;
     ?*)
-      echo "Usage: ./setup.sh [--install]"
-      echo "                  [--uninstall]"
-      echo "                  [--installdir=<dir>]"
-      echo "                  [--builddir=<dir>]"
-      echo "                  [--clean]"
-      echo "                  [--no-patch]"
-      echo "                  [--no-build]"
-      echo "                  [--clone | --download]"
-      echo "                  [--makejobs=<number>]"
-      echo "                  [--help | -h]"
+      option=$(echo ${option} | sed -e "s/\(--[a-z]*\)=.*/\1/")
+      echo "\nunrecognized option: ${option}"
+      echo "${usage}"
       exit 1
     ;;
 
@@ -673,7 +717,9 @@ then
   echo -n "\nUninstalling..."
   sudo rm -Rf ${installdir}/${platform}
   echo -n "."
-  sudo rm -f ${installdir}/bin/*-${platform}-*
+  sudo rm -f ${installdir}/bin/sh-${platform}-*
+  echo -n "."
+  sudo rm -f ${installdir}/bin/arm-${platform}-*
   echo -n "."
   sudo rm -f ${installdir}/bin/sh-elf-${gcc_dir}
   echo -n "."
@@ -817,25 +863,22 @@ echo "\n======= [ Downloads complete! ] ======="
 ################################################################################
 echo "\n======= [ Configuring, building, installing ] ======="
 
-assert_dir "Binutils"   "${binutils_dir}"
-assert_dir "GCC"        "${gcc_dir}"
-assert_dir "Newlib"     "${newlib_dir}"
-assert_dir "GMP"        "${gmp_dir}"
-assert_dir "MPFR"       "${mpfr_dir}"
-assert_dir "MPC"        "${mpc_dir}"
-
-# make symlinks for GCC... at least until I figure out the flags to specify their locations
-if [ ! -e ${builddir}/${gcc_dir}/gmp ]
+if ${build_arm_c_toolchain} || ${build_sh4_c_toolchain}
 then
-  ln -sf ${builddir}/${gmp_dir}  ${builddir}/${gcc_dir}/gmp
-  ln -sf ${builddir}/${mpfr_dir} ${builddir}/${gcc_dir}/mpfr
-  ln -sf ${builddir}/${mpc_dir}  ${builddir}/${gcc_dir}/mpc
-fi
+  assert_dir "Binutils"   "${binutils_dir}"
+  assert_dir "GCC"        "${gcc_dir}"
+  assert_dir "Newlib"     "${newlib_dir}"
+  assert_dir "GMP"        "${gmp_dir}"
+  assert_dir "MPFR"       "${mpfr_dir}"
+  assert_dir "MPC"        "${mpc_dir}"
 
-if ! ${build}
-then
-  log_error "Not building.  Finished!"
-  exit 0
+  # make symlinks for GCC... at least until I figure out the flags to specify their locations
+  if [ ! -e ${builddir}/${gcc_dir}/gmp ]
+  then
+    ln -sf ${builddir}/${gmp_dir}  ${builddir}/${gcc_dir}/gmp
+    ln -sf ${builddir}/${mpfr_dir} ${builddir}/${gcc_dir}/mpfr
+    ln -sf ${builddir}/${mpc_dir}  ${builddir}/${gcc_dir}/mpc
+  fi
 fi
 
 target_name () {
@@ -960,17 +1003,13 @@ then
 fi
 # </=== BUILD SH4 LIB C ===>
 
+environment="-e PLATFORM=${platform} -e ARCH=${target} -e INSTALL_PATH=${installdir} -e DEBUG=true"
+
 # <=== BUILD SH4 C++ COMPILER ===>
 if ${build_sh4_cpp_compiler}
 then
   assert_dir "KOS" "${kos_dir}"
-  sudo mkdir -p ${target_dir}/include/kos
-  sudo mkdir -p ${target_dir}/include/sys
-  sudo cp -R ${kos_dir}/common/include/kos           ${target_dir}/include/
-  sudo cp -R ${kos_dir}/${platform}/include/*        ${target_dir}/include/
-  sudo cp ${kos_dir}/common/include/pthread.h        ${target_dir}/include/
-  sudo cp ${kos_dir}/common/include/sys/_pthread.h   ${target_dir}/include/sys/
-  sudo cp ${kos_dir}/common/include/sys/sched.h      ${target_dir}/include/sys/
+  step_template "${builddir}/${kos_dir}" "Installing headers to build SH4 C++ compiler." "sudo ${make_tool} ${environment} install_headers"  "install_headers.log"
 
   configure_and_make ${gcc_dir} ${target} "${cpu_options} ${library_options} --enable-languages=c,c++ --enable-threads=kos"
 
@@ -983,7 +1022,6 @@ fi
 # <=== BUILD LIBRARIES ===>
 if ${build_libraries}
 then
-  environment="-e PLATFORM=${platform} -e ARCH=${target} -e INSTALL_PATH=${installdir}"
   until [ "x${name_dir}:" = "x${libraries}" ]
   do
     name_dir=$(echo "${libraries}" | cut -d ':' -f 1)
@@ -1014,9 +1052,9 @@ exit 0
 
 # for non-specialized toolchains
 # SH toolchains
-CFLAGS= -ml -m4-single-only
-AFLAGS= -little
-LDFLAGS= -ml -m4-single-only -Wl,-Ttext=0x8c010000 -Wl,--gc-sections
+CFLAGS=-ml -m4-single-only
+AFLAGS=-little
+LDFLAGS=-ml -m4-single-only -Wl,-Ttext=0x8c010000 -Wl,--gc-sections
 
 # ARM toolchains
 CFLAGS= -mcpu=arm7di -fno-strict-aliasing -Wl,--fix-v4bx -Wa,--fix-v4bx
