@@ -17,7 +17,7 @@
 # Function to print to stdout and log
 # @param[in] $1 message
 announce () {
-  echo ${1} | tee -a ${log}
+  echo "${1}" | tee -a ${log}
 }
 
 # Function to record error to log
@@ -71,10 +71,51 @@ detect () {
   eval "${1} --version >> /dev/null 2>&1"
   if [ $? -ne 0 ]
   then
-    echo false
+    echo "false"
   fi
-  echo true
+  echo "true"
 }
+
+has_git=$(detect "git")
+has_gzip=$(detect "gzip")
+has_bzip2=$(detect "bzip2")
+has_xz=$(detect "xz")
+
+# identify and create command strings to download silently and with a progress output
+if $(detect "wget")
+then
+  exec_download_silent="wget -q -c -O"
+  exec_download_progress="wget --show-progress --progress=bar:force:noscroll -q -c -O"
+elif $(detect "curl")
+then
+  exec_download_silent="curl -s -C - -o"
+  exec_download_progress="curl -# -C - -o"
+elif $(detect "fetch")
+then
+  exec_download_silent="fetch -q -m -a -o"
+  exec_download_progress="fetch -m -a -o"
+elif $(detect "aria2c")
+then
+  exec_download_silent="aria2c -q -c -o"
+  exec_download_progress="aria2c -c -o"
+else
+  log_error "No download utility found!"
+  return 1
+fi
+
+if $(detect "sha512sum")
+then
+  exec_sha_checksum="sha512sum"
+elif $(detect "shasum")
+then
+  exec_sha_checksum="shasum -a 512"
+elif $(detect "sha512")
+then
+  exec_sha_checksum="sha512"
+else
+  exec_sha_checksum="false"
+fi
+
 
 
 # Function to download a file
@@ -84,60 +125,21 @@ detect () {
 # @param[in] $3 options (optional)
 
 # @return the result of the underlying call or 1 if no utility is found
-has_wget=$(detect "wget")
-has_curl=$(detect "curl")
-has_fetch=$(detect "fetch")
-has_aria2c=$(detect "aria2c")
+
 download ()
 {
   url=$1
   outfile=$2
   options=$3
 
-  if ${has_wget}
-  then
-    case ${options} in
-      silent)
-        wget -q -c -O "${outfile}" "${url}"
-      ;;
-      *)
-        wget --show-progress --progress=bar:force:noscroll -q -c -O "${outfile}" "${url}"
-      ;;
-    esac
-  elif ${has_curl}
-  then
-    case ${options} in
-      silent)
-        curl -s -C - -o "${outfile}" "${url}"
-      ;;
-      *)
-        curl -# -C - -o "${outfile}" "${url}"
-      ;;
-    esac
-  elif ${has_fetch}
-    then
-    case ${options} in
-      silent)
-        fetch -q -m -a -o "${outfile}" "${url}"
-      ;;
-      *)
-        fetch -m -a -o "${outfile}" "${url}"
-      ;;
-    esac
-  elif ${has_aria2c}
-    then
-    case ${options} in
-      silent)
-        aria2c -q -c -o "${outfile}" "${url}"
-      ;;
-      *)
-        aria2c -c -o "${outfile}" "${url}"
-      ;;
-    esac
-  else
-    log_error "No download utility found!"
-    return 1
-  fi
+  case ${options} in
+    silent)
+      eval "${exec_download_silent} \"${outfile}\" \"${url}\""
+    ;;
+    *)
+      eval "${exec_download_progress} \"${outfile}\" \"${url}\""
+    ;;
+  esac
   return $?
 }
 
@@ -164,7 +166,7 @@ unpack ()
 
   if [ "x$destination" != "x" ]
   then
-    if ! mv `echo ${filename} | sed -e "s/\(.*\).tar.[a-z]\{2,3\}/\1/"` ${destination} >> ${log} 2>&1
+    if ! mv $(echo "${filename}" | sed -e "s/\(.*\).tar.[a-z]\{2,3\}/\1/") ${destination} >> ${log} 2>&1
     then
       log_error "Unable to move unpacked dir to ${destination}"
       return 1
@@ -178,27 +180,18 @@ unpack ()
 # @param[in] $2 expected SH256 checksum
 
 # @return 0 on success, 1 on failure.
-has_sha512sum=$(detect "sha512sum")
-has_shasum=$(detect "shasum")
-has_sha512=$(detect "sha512")
 validate_file () {
   filename=${1}
   sha512sum=${2}
 
-  echo -n "Validating ${filename}... "
-  if ${has_sha512sum}
+  if [ "${exec_sha_checksum}" = "false" ]
   then
-    checksum=`sha512sum ${filename} | cut -d ' ' -f 1`
-  elif ${has_shasum}
-  then
-    checksum=`shasum -a 512 ${filename} | cut -d ' ' -f 1`
-  elif ${has_sha512}
-  then
-    checksum=`sha512 ${filename} | cut -d ' ' -f 1`
-  else
     echo "No checksum tool found. Skipping check."
     return 0
   fi
+
+  echo -n "Validating ${filename}..."
+  checksum=$(${exec_sha_checksum} ${filename} | cut -d ' ' -f 1)
 
   if [ "${checksum}" != "${sha512sum}" ]
   then
@@ -218,50 +211,114 @@ validate_file () {
 # @param[in] $3 The user/organization.
 
 # @return  The result of the underlying call to clone or download a tool.
-has_git=$(detect "git")
 git_tool ()
 {
-  repo=$1
+  name=$1
   branch=$2
   organization=$3
-  eval "`echo ${repo} | sed -e "s/[^0-9a-zA-Z]/_/g"`_dir=${repo}"
+  eval "`echo "${name}" | sed -e "s/[^0-9a-zA-Z]/_/g"`_dir=${name}"
 
   # If --clean is in action and old source exists, attempt delete
   # If old source exists, delete
   if ${clean}
   then
-    if ! rm -Rf ${repo} >> ${log} 2>&1
+    if ! rm -Rf ${name} >> ${log} 2>&1
     then
-      log_warning "Unable to delete old ${tool}"
+      log_warning "Unable to delete old ${name}"
     fi
   fi
 
-  if [ -e "${repo}" ]
+  if [ -e "${name}" ]
   then
-    echo "${repo} already downloaded."
-  elif ${clone}
+    echo "${name} already downloaded."
+  elif ${clone} && ${has_git}
   then
-    echo "Cloning ${repo}..."
-    if ! git clone -q -b ${branch} ${git_transport_prefix}/${organization}/${repo}.git >> ${log} 2>&1
+    echo "Cloning ${name}..."
+    if ! git clone -q -b ${branch} ${git_transport_prefix}/${organization}/${name}.git >> ${log} 2>&1
     then
-      log_error "Unable to clone ${tool}"
+      log_error "Unable to clone ${name}"
       return 1
     fi
   else
-    echo "Downloading repository: \"${repo}\" - branch: \"${branch}\""
-    if ! download "${git_transport_prefix}/${organization}/${repo}/archive/${branch}.tar.gz" "${repo}-${branch}.tar.gz"
+    echo "Downloading repository: \"${name}\" - branch: \"${branch}\""
+    if ! download "${git_transport_prefix}/${organization}/${name}/archive/${branch}.tar.gz" "${name}-${branch}.tar.gz"
     then
-      log_error "Unable to download ${tool}"
+      log_error "Unable to download ${name}"
       return 1
     fi
 
-    if ! unpack "${repo}-${branch}.tar.gz" "${repo}"
+    if ! unpack "${name}-${branch}.tar.gz" "${name}"
     then
-      log_error "Unable to unpack ${repo}"
+      log_error "Unable to unpack ${name}"
       return 1
     fi
   fi
 }
+
+
+# Function to either download a tool or clone a git repository
+
+# @param[in] $1 destination directory
+# @param[in] $2 source URL
+
+# @return  The result of the underlying call to clone or download a tool.
+generic_download_tool ()
+{
+  name=$1
+  url=$2
+  eval "`echo \"${name}\" | sed -e \"s/[^0-9a-zA-Z]/_/g\"`_dir=\"${name}\""
+
+  filename=$(echo "${url}" | sed -e "s/.\+\/\([^/]*.tar.[a-z]\{2,3\}\)/\1/")
+  if [ "${filename}" = "${url}" ]
+  then
+    is_git="true"
+  else
+    is_git="false"
+  fi
+
+  # If --clean is in action and old source exists, attempt delete
+  # If old source exists, delete
+  if ${clean}
+  then
+    if ! rm -Rf ${name} >> ${log} 2>&1
+    then
+      log_warning "Unable to delete old ${name}"
+    fi
+  fi
+
+  if [ -e "${name}" ]
+  then
+    echo "${name} already downloaded."
+  elif ${is_git}
+  then
+    if ! ${has_git}
+    then
+      log_error "Unable to clone ${name}"
+      return 1;
+    fi
+    echo "Cloning ${name}..."
+    if ! git clone -q ${url} ${name} >> ${log} 2>&1
+    then
+      log_error "Unable to clone ${name}"
+      return 1
+    fi
+  else
+    echo "Downloading ${filename}..."
+
+    if ! download ${url} ${filename}
+    then
+      log_error "Unable to download ${name}"
+      return 1
+    fi
+
+    if ! unpack "${filename}" "${name}"
+    then
+      log_error "Unable to unpack ${name}"
+      return 1
+    fi
+  fi
+}
+
 
 # Function to download a toolchain component
 
@@ -270,16 +327,13 @@ git_tool ()
 # @param[in] $3 gnu mirror URL (optional)
 
 # @return 0 on success, anything else indicates failure
-has_gzip=$(detect "gzip")
-has_bzip2=$(detect "bzip2")
-has_xz=$(detect "xz")
 gnu_download_tool ()
 {
-  tool=$1
+  name=$1
   version=$2
-  target=${tool}-${version}
+  target=${name}-${version}
   urlbase=$3
-  eval "`echo ${tool} | sed -e "s/[^0-9a-zA-Z]/_/g"`_dir=${target}"
+  eval "`echo \"${name}\" | sed -e \"s/[^0-9a-zA-Z]/_/g\"`_dir=\"${target}\""
 
   if [ "x${urlbase}" = "x" ]
   then
@@ -306,8 +360,8 @@ gnu_download_tool ()
     if [ -e "${target}.sum" ]
     then
       echo "${target} archive already downloaded."
-      filename=`ls ${target}.tar.*`
-      if ${validate} && ! validate_file "${filename}" `cat ${target}.sum`
+      filename=$(ls ${target}.tar.*)
+      if ${validate} && ! validate_file "${filename}" $(cat ${target}.sum)
       then
         log_error "Download for ${target} does not match checksum in checksums.txt"
         return 1
@@ -322,12 +376,12 @@ gnu_download_tool ()
       echo -n "Locating ${target}.."
   # check the locations it /might/ be
       for directory in \
-          "${urlbase}/${tool}" \
-          "${urlbase}/${tool}/releases" \
-          "${urlbase}/${tool}/releases/${target}" \
-          "${urlbase}/${tool}/${version}" \
-          "${urlbase}/${tool}/snapshots" \
-          "${urlbase}/${tool}/snapshots/${target}" \
+          "${urlbase}/${name}" \
+          "${urlbase}/${name}/releases" \
+          "${urlbase}/${name}/releases/${target}" \
+          "${urlbase}/${name}/${version}" \
+          "${urlbase}/${name}/snapshots" \
+          "${urlbase}/${name}/snapshots/${target}" \
           "${urlbase}/gcc/infrastructure" \
           "error"
       do
@@ -342,7 +396,7 @@ gnu_download_tool ()
         touch checksums.txt
         if download "${directory}/sha512.sum" "checksums.txt" "silent"
         then
-          output=`grep "${target}.tar" checksums.txt`
+          output=$(grep "${target}.tar" checksums.txt)
           if [ "x${output}" != "x" ]
           then
             echo " found."
@@ -351,11 +405,11 @@ gnu_download_tool ()
         fi
       done
 
-      for line in `grep "${target}.tar" checksums.txt | sed -e "s/\([0-9a-f]\{128\}\)  .*.tar.\([a-z]\{2,3\}\)/\1:\2/"`
+      for line in $(grep "${target}.tar" checksums.txt | sed -e "s/\([0-9a-f]\{128\}\)  .*.tar.\([a-z]\{2,3\}\)/\1:\2/")
       do
-        this_sha512sum=`echo ${line} | cut -d ':' -f 1`
+        this_sha512sum=$(echo "${line}" | cut -d ':' -f 1)
 
-        case `echo ${line} | cut -d ':' -f 2` in
+        case $(echo "${line}" | cut -d ':' -f 2) in
           gz)
             if [ "x${filename}" = "x" ] && ${has_gzip}
             then
@@ -388,7 +442,7 @@ gnu_download_tool ()
       announce "Downloading ${target}..."
       if ! download "${directory}/${filename}" "${filename}"
       then
-        log_error "Unable to download ${tool}"
+        log_error "Unable to download ${name}"
         return 1
       fi
 
@@ -398,14 +452,14 @@ gnu_download_tool ()
         return 1
       elif ${validate}
       then
-        echo ${checksum} > ${target}.sum
+        echo "${checksum}" > ${target}.sum
       fi
 
       rm -f checksums.txt
 
       if ! unpack "${filename}"
       then
-        log_error "Unable to unpack ${tool}"
+        log_error "Unable to unpack ${name}"
         return 1
       fi
     fi
@@ -413,7 +467,7 @@ gnu_download_tool ()
     if ${patch}
     then
       announce "Applying patches..."
-      for patchfile in `ls -1 ${basedir}/patches/*.diff | grep "${target}"`
+      for patchfile in $(ls -1 ${basedir}/patches/*.diff | grep "${target}")
       do
         patch -p1 -N -d ${target} -i ${patchfile} >> ${log} 2>&1
       done
@@ -432,24 +486,27 @@ download_components()
   IFS="
 " # We only want the newline character
 
-  announce "\nUpdating configuration defaults..."
-  if ! download "http://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.guess;hb=HEAD" "${builddir}/config.guess" "silent"
+  if [ ! -f ${builddir}/config.guess ] || [ ! -f ${builddir}/config.sub ]
   then
-    log_error "Unable to download config.guess"
-  fi
-  if ! download "http://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.sub;hb=HEAD"   "${builddir}/config.sub"   "silent"
-  then
-    log_error "Unable to download config.sub"
+    announce "\nUpdating configuration defaults..."
+    if ! download "http://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.guess;hb=HEAD" "${builddir}/config.guess" "silent"
+    then
+      log_error "Unable to download config.guess"
+    fi
+    if ! download "http://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.sub;hb=HEAD"   "${builddir}/config.sub"   "silent"
+    then
+      log_error "Unable to download config.sub"
+    fi
   fi
 
-  for line in `cat ${basedir}/components.conf | grep -v '^#' | grep -v '^$'`
+  for line in $(cat ${basedir}/components.conf | grep -v '^#' | grep -v '^$')
   do
     echo ""
     case ${line} in
       toolchain:*)
-        name=`      echo ${line} | cut -d ':' -f 2`
-        version=`   echo ${line} | cut -d ':' -f 3`
-        forced_url=`echo ${line} | cut -d ':' -f 4`
+        name=$(      echo "${line}" | cut -d ':' -f 2)
+        version=$(   echo "${line}" | cut -d ':' -f 3)
+        forced_url=$(echo "${line}" | cut -d ':' -f 4)
 
         if ! gnu_download_tool "${name}" "${version}" "${forced_url}"
         then
@@ -464,9 +521,9 @@ download_components()
       ;;
 
       ${platform}:*)
-        repo=`  echo ${line} | cut -d ':' -f 2`
-        branch=`echo ${line} | cut -d ':' -f 3`
-        organization=`  echo ${line} | cut -d ':' -f 4`
+        name=$(        echo "${line}" | cut -d ':' -f 2)
+        branch=$(      echo "${line}" | cut -d ':' -f 3)
+        organization=$(echo "${line}" | cut -d ':' -f 4)
         if [ "x${branch}" = "x" ]
         then
           branch="master"
@@ -476,24 +533,26 @@ download_components()
           organization="GravisZro"
         fi
 
-        if ! git_tool "${repo}" "${branch}" "${organization}"
+        if ! git_tool "${name}" "${branch}" "${organization}"
         then
           return 1
         fi
       ;;
 
-      lib:*)
-        name=`echo ${line} | cut -d ':' -f 2`
-        url=` echo ${line} | cut -d ':' -f 3`
+      library:*)
+        name=$(echo "${line}" | cut -d ':' -f 2)
+        url=$( echo "${line}" | sed -e "s/[^:]\+:[^:]\+:\(.\+\)/\1/")
 
-        if ! lib_tool "${name}" "${url}"
+        if ! generic_download_tool "${name}" "${url}"
         then
           return 1
         fi
+        name_dir=$(echo "${name}" | sed -e "s/[^0-9a-zA-Z]/_/g")
+        libraries="${libraries}${name_dir}:"
       ;;
 
       *)
-        echo Unrecognized prefix!
+        echo "Unrecognized prefix!"
       ;;
     esac
   done
@@ -515,22 +574,32 @@ clean=false
 clone=false
 patch=true
 build=true
+if true
+then
 build_arm_c_toolchain=true
 build_sh4_c_toolchain=true
 build_sh4_libc=true
 build_sh4_cpp_compiler=true
 build_libraries=true
+else
+build_arm_c_toolchain=false
+build_sh4_c_toolchain=false
+build_sh4_libc=false
+build_sh4_cpp_compiler=false
+build_libraries=true
+fi
 
 platform="dreamcast"
 git_transport_prefix="https://github.com"
 gnu_url="ftp://gcc.gnu.org/pub"
 
-basedir=$(absolutedir `dirname $0`)
+basedir=$(absolutedir $(dirname $0))
 builddir=$(absolutedir "${basedir}/builds")
 installdir="/usr/local"
+libraries=""
 
-
-until
+until [ "x$1" = "x" ]
+do
   opt=$1
   case ${opt} in
     --install)
@@ -596,8 +665,6 @@ until
     *)
     ;;
   esac
-  [ "x${opt}" = "x" ]
-do
   shift
 done
 
@@ -645,10 +712,10 @@ fi
 echo "\n======= [ Initializing ] =======\n"
 
 # Determine the number of processes to use for building
-makejobs=`nproc --all`
+makejobs=$(nproc --all)
 if [ $? -ne 0 ]
 then
-  makejobs=`sysctl hw.ncpu | cut -f2 -d' '`
+  makejobs=$(sysctl hw.ncpu | cut -f2 -d' ')
   if [ $? -ne 0 ]
   then
     makejobs="1"
@@ -772,7 +839,7 @@ then
 fi
 
 target_name () {
-  echo `echo ${1} | cut -d '-' -f 1`-${platform}
+  echo "`echo \"${1}\" | cut -d '-' -f 1`-${platform}"
 }
 
 step_template() {
@@ -780,7 +847,7 @@ step_template() {
   message=${2}
   command=${3}
   logfile=${4}
-  olddir=`pwd`
+  olddir=$(pwd)
 
   announce ${message}
   cd ${dir}
@@ -916,13 +983,23 @@ fi
 # <=== BUILD LIBRARIES ===>
 if ${build_libraries}
 then
-  if [ -e "${kos_dir}" ]
-  then
-    environment="-e PLATFORM=${platform} -e ARCH=${target} -e INSTALL_PATH=${installdir}"
-    announce "\n[ kos ]"
-    step_template "${builddir}/${kos_dir}" "Building..."   "${make_tool} -j${makejobs} ${environment}" "build.log"
-    step_template "${builddir}/${kos_dir}" "Installing..." "sudo ${make_tool} ${environment} install"  "install.log"
-  fi
+  environment="-e PLATFORM=${platform} -e ARCH=${target} -e INSTALL_PATH=${installdir}"
+  until [ "x${name_dir}:" = "x${libraries}" ]
+  do
+    name_dir=$(echo "${libraries}" | cut -d ':' -f 1)
+    libraries=$(echo "${libraries}" | sed -e "s/[^:]*:\(.\+\)/\1/")
+
+    assert_dir "${name_dir}" "${name_dir}"
+
+    announce "\n[ ${name_dir} ]"
+    if [ -e "${basedir}/makefiles/${name_dir}" ]
+    then
+      announce "Replacing Makefile..."
+      cp -f ${basedir}/makefiles/${name_dir} ${builddir}/${name_dir}/Makefile
+    fi
+    step_template "${builddir}/${name_dir}" "Building..."   "${make_tool} -j${makejobs} ${environment}" "build.log"
+    step_template "${builddir}/${name_dir}" "Installing..." "sudo ${make_tool} ${environment} install"  "install.log"
+  done
 fi
 # </=== BUILD LIBRARIES ===>
 
