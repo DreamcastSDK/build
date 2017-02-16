@@ -721,9 +721,7 @@ then
   echo -n "\nUninstalling..."
   sudo rm -Rf ${installdir}/${platform}
   echo -n "."
-  sudo rm -f ${installdir}/bin/sh-${platform}-*
-  echo -n "."
-  sudo rm -f ${installdir}/bin/arm-${platform}-*
+  sudo rm -f ${installdir}/bin/${platform}-*-*
   echo -n "."
   sudo rm -f ${installdir}/bin/sh-elf-${gcc_dir}
   echo -n "."
@@ -885,7 +883,7 @@ then
 fi
 
 target_name () {
-  echo "`echo \"${1}\" | cut -d '-' -f 1`-${platform}"
+  echo "${platform}-`echo \"${1}\" | cut -d '-' -f 1`"
 }
 
 step_template() {
