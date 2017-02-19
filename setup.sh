@@ -1017,6 +1017,7 @@ then
   sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${target_dir}/lib/specs
   sudo rm ${target_dir}/lib/ldscripts/shlelf.*
   sudo cp ${basedir}/scripts/shlelf.x ${target_dir}/lib/ldscripts/
+  sudo ln -rs ${target_dir}/lib/ldscripts/shlelf.x ${target_dir}/lib/ldscripts/shlelf.xc
 fi
 # </=== BUILD SH4 C++ COMPILER ===>
 
