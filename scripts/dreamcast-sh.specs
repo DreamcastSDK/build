@@ -1,5 +1,5 @@
 *asm:
-%(subtarget_asm_endian_spec) %{mrelax:-relax %(subtarget_asm_relax_spec)}%(subtarget_asm_isa_spec) %(subtarget_asm_spec)%{m2a:--isa=sh2a} %{m2a-single:--isa=sh2a} %{m2a-single-only:--isa=sh2a} %{m2a-nofpu:--isa=sh2a-nofpu} %{m5-compact*:--isa=SHcompact} %{m5-32media*:--isa=SHmedia --abi=32} %{m5-64media*:--isa=SHmedia --abi=64} %{m4al:-dsp} %{mcut2-workaround:-cut2-workaround}
+%(subtarget_asm_endian_spec) %{mrelax:-relax %(subtarget_asm_relax_spec)}%(subtarget_asm_isa_spec) %(subtarget_asm_spec)%{m2a:--isa=sh2a} %{m2a-single:--isa=sh2a} %{m2a-single-only:--isa=sh2a} %{m2a-nofpu:--isa=sh2a-nofpu} %{m5-compact*:--isa=SHcompact} %{m5-32media*:--isa=SHmedia --abi=32} %{m5-64media*:--isa=SHmedia --abi=64} %{m4al:-dsp} %{mcut2-workaround:-cut2-workaround} %{!mbig:%{!mbig-endian:%{!be:%{!EB:-little}}}}
 
 *asm_debug:
 
@@ -15,7 +15,7 @@
  as %(asm_options) %m.s %A }  }
 
 *cpp:
- %(subtarget_cpp_spec) 
+ %(subtarget_cpp_spec)
 
 *cpp_options:
 %(cpp_unique_options) %1 %{m*} %{std*&ansi&trigraphs} %{W*&pedantic*} %{w} %{f*} %{g*:%{!g0:%{g*} %{!fno-working-directory:-fworking-directory}}} %{O*} %{undef} %{save-temps*:-fpch-preprocess}
@@ -33,7 +33,7 @@ cc1 -E %{traditional|traditional-cpp:-traditional-cpp}
 
 
 *cc1_options:
-%{pg:%{fomit-frame-pointer:%e-pg and -fomit-frame-pointer are incompatible}} %{!iplugindir*:%{fplugin*:%:find-plugindir()}} %1 %{!Q:-quiet} %{!dumpbase:-dumpbase %B} %{d*} %{m*} %{aux-info*} %{fcompare-debug-second:%:compare-debug-auxbase-opt(%b)}  %{!fcompare-debug-second:%{c|S:%{o*:-auxbase-strip %*}%{!o*:-auxbase %b}}}%{!c:%{!S:-auxbase %b}}  %{g*} %{O*} %{W*&pedantic*} %{w} %{std*&ansi&trigraphs} %{v:-version} %{pg:-p} %{p} %{f*} %{undef} %{Qn:-fno-ident} %{Qy:} %{-help:--help} %{-target-help:--target-help} %{-version:--version} %{-help=*:--help=%*} %{!fsyntax-only:%{S:%W{o*}%{!o*:-o %b.s}}} %{fsyntax-only:-o %j} %{-param*} %{fmudflap|fmudflapth:-fno-builtin -fno-merge-constants} %{coverage:-fprofile-arcs -ftest-coverage}
+%{pg:%{fomit-frame-pointer:%e-pg and -fomit-frame-pointer are incompatible}} %{!iplugindir*:%{fplugin*:%:find-plugindir()}} %1 %{!Q:-quiet} %{!dumpbase:-dumpbase %B} %{d*} %{m*} %{aux-info*} %{fcompare-debug-second:%:compare-debug-auxbase-opt(%b)}  %{!fcompare-debug-second:%{c|S:%{o*:-auxbase-strip %*}%{!o*:-auxbase %b}}}%{!c:%{!S:-auxbase %b}}  %{g*} %{O*} %{W*&pedantic*} %{w} %{std*&ansi&trigraphs} %{v:-version} %{pg:-p} %{p} %{f*} %{undef} %{Qn:-fno-ident} %{Qy:} %{-help:--help} %{-target-help:--target-help} %{-version:--version} %{-help=*:--help=%*} %{!fsyntax-only:%{S:%W{o*}%{!o*:-o %b.s}}} %{fsyntax-only:-o %j} %{-param*} %{fmudflap|fmudflapth:-fno-builtin -fno-merge-constants} %{coverage:-fprofile-arcs -ftest-coverage} -D__DREAMCAST__ -I/usr/local/dreamcast/sh-elf/include
 
 *cc1plus:
 
@@ -51,7 +51,7 @@ cc1 -E %{traditional|traditional-cpp:-traditional-cpp}
 -m %(link_emul_prefix)%{m5-compact*|m5-32media*:32}%{m5-64media*:64}%{!m1:%{!m2:%{!m3*:%{!m4*:%{!m5*:%(link_default_cpu_emul)}}}}}%(subtarget_link_emul_suffix) %{mrelax:-relax} %(subtarget_link_spec)
 
 *lib:
--lc
+--start-group -lkos -lm -lc -lgcc --end-group
 
 *mfwrap:
  %{static: %{fmudflap|fmudflapth:  --wrap=malloc --wrap=free --wrap=calloc --wrap=realloc --wrap=mmap --wrap=mmap64 --wrap=munmap --wrap=alloca} %{fmudflapth: --wrap=pthread_create}} %{fmudflap|fmudflapth: --wrap=main}
