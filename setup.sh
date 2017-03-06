@@ -17,44 +17,75 @@
 # Function to print to stdout and log
 # @param[in] $@ message
 announce () {
-  echo "${@}" | tee -a ${log}
+  echo "$@" | tee -a ${log}
 }
 
 # Function to record error to log
 # @param[in] $1 message
 log_error () {
-  announce "ERROR: ${1}"
+  announce "ERROR: $1"
 }
 
 # Function to record warning to log
 # @param[in] $1 message
 log_warning () {
-  announce "WARNING: ${1}"
+  announce "WARNING: $1"
 }
 
 # Function concatonate strings into a single string
 # @param[in] $@ input strings
 concat () {
-  until [ "x${1}" = "x" ]
+  until [ "x$1" = "x" ]
   do
-    echo -n "${1}"
+    echo -n $1
     shift
   done
+}
+
+# Function to convert a string to lowercase
+# @param[in] $1 string
+to_lower () {
+  echo $1 | sed -e "s/\([A-Z]\)/\l\1/g"
+}
+
+# Function to convert a string to uppercase
+# @param[in] $1 string
+to_upper () {
+  echo $1 | sed -e "s/\([a-z]\)/\U\1/g"
+}
+
+# Function to convert a string to an acceptible variable name
+# @param[in] $1 string
+to_variable () {
+  echo $1 | sed -e "s/\([^a-z^a-Z^0-9]\)/_/g"
+}
+
+
+# Function to convert a path string to a escaped path
+# @param[in] $1 string
+escape_path () {
+  echo $1 | sed -e "s/\//\\\\\//g"
+}
+
+# Function to convert a path string to a quadrupal escaped path
+# @param[in] $1 string
+sed_path () {
+  echo $1 | sed -e "s/\//\\\\\\\\\//g"
 }
 
 # Function to extract value from argument
 # @param[in] $1 input string e.g. --flagname=value
 arg_value () {
-  echo "${1}" | sed -e "s/--[a-z]*=\(.*\)/\1/"
+  echo $1 | sed -e "s/--[a-z]*=\(.*\)/\1/"
 }
 
 # Function that faults if a directory doesn't exist
 # @param[in] $1 program name
 # @param[in] $2 program directory
 assert_dir () {
-  if [ ! -e "${2}" ]
+  if [ ! -e "$2" ]
   then
-    log_error "Directory for ${1} is missing! Expected: ${2}"
+    log_error "Directory for $1 is missing! Expected: $2"
     exit 1
   fi
 }
@@ -63,13 +94,13 @@ assert_dir () {
 # @param[in] $1  The directory to make absolute if necessary.
 absolutedir()
 {
-  case ${1} in
+  case $1 in
     /*)
-      echo "${1}"
+      echo "$1"
     ;;
 
     *)
-      echo "${PWD}/${1}"
+      echo "${PWD}/$1"
     ;;
   esac
 }
@@ -78,7 +109,7 @@ absolutedir()
 # @param[in] $1 program
 # @return the result of the underlying call or 1 if no utility is found
 detect () {
-  eval "${1} --version >> /dev/null 2>&1"
+  eval "$1 --version >> /dev/null 2>&1"
   if [ $? -ne 0 ]
   then
     echo "false"
@@ -191,8 +222,8 @@ unpack ()
 
 # @return 0 on success, 1 on failure.
 validate_file () {
-  filename=${1}
-  sha512sum=${2}
+  filename=$1
+  sha512sum=$2
 
   if [ "${exec_sha_checksum}" = "false" ]
   then
@@ -743,7 +774,7 @@ then
     [yY][eE][sS]);;
     *)
       echo "\nAborting installation\n"
-      eval "sh ${0} --help"
+      eval "sh $0 --help"
       echo ""
       exit 1
     ;;
@@ -883,14 +914,14 @@ then
 fi
 
 target_name () {
-  echo "${platform}-`echo \"${1}\" | cut -d '-' -f 1`"
+  echo "${platform}-`echo \"$1\" | cut -d '-' -f 1`"
 }
 
 step_template() {
-  dir=${1}
-  message=${2}
-  command=${3}
-  logfile=${4}
+  dir=$1
+  message=$2
+  command=$3
+  logfile=$4
   olddir=$(pwd)
 
   announce "${message}"
@@ -904,8 +935,8 @@ step_template() {
 }
 
 configure_and_make () {
-  wd_dir=${1}
-  target=${2}
+  wd_dir=$1
+  target=$2
   new_target=$(target_name ${target})
   conf_flags="--prefix=${installdir} \
               --exec-prefix=${installdir}/${platform} \
@@ -914,7 +945,7 @@ configure_and_make () {
               --disable-werror \
               --target=${target} \
               --program-prefix=${new_target}- \
-              ${3}"
+              $3"
   compilation_dir=${builddir}/${new_target}-${wd_dir}
 
   announce "\n[ ${new_target}-${wd_dir} ]"
@@ -949,7 +980,8 @@ then
   fi
   configure_and_make "${gcc_dir}" "${target}" "${cpu_options} ${library_options} --enable-languages=c --without-headers"
 
-  sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${target_dir}/lib/specs
+  sudo sh -c "cat ${basedir}/scripts/$(target_name ${target}).specs | sed -e s/$(to_upper $(to_variable $(target_name ${target})_include_path))/$(sed_path ${target_dir}/include)/g > ${target_dir}/lib/specs"
+#  sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${target_dir}/lib/specs
 fi
 # </=== BUILD ARM C TOOLCHAIN ===>
 
@@ -1010,9 +1042,12 @@ then
 
   configure_and_make "${gcc_dir}" "${target}" "${cpu_options} ${library_options} --enable-languages=c,c++ --enable-threads=kos"
 
-  sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${target_dir}/lib/specs
+  sudo sh -c "cat ${basedir}/scripts/$(target_name ${target}).specs | sed -e s/$(to_upper $(to_variable $(target_name ${target})_include_path))/$(sed_path ${target_dir}/include)/g > ${target_dir}/lib/specs"
+#  sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${target_dir}/lib/specs
   sudo rm ${target_dir}/lib/ldscripts/shlelf.*
   sudo cp ${basedir}/scripts/shlelf.* ${target_dir}/lib/ldscripts/
+  sudo sh -c "cat ${basedir}/scripts/shlelf.x | sed -e s/$(to_upper $(to_variable $(target_name ${target})_lib_path))/$(sed_path ${target_dir}/lib)/g > ${target_dir}/lib/ldscripts/shlelf.x"
+
 fi
 # </=== BUILD SH4 C++ COMPILER ===>
 
