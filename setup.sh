@@ -510,7 +510,7 @@ gnu_download_tool ()
       for patchfile in $(ls -1 ${basedir}/patches/*.diff | grep "${target}")
       do
         announce "Applying patch ${patchfile}..."
-        patch -p1 -N -d ${target} -i ${patchfile} >> ${log} 2>&1
+        sed -e s/_arch_dreamcast/__DREAMCAST__/ ${patchfile} | patch -p1 -N -d ${target} >> ${log} 2>&1
       done
     fi
   fi
@@ -621,7 +621,7 @@ build_sh4_libc=true
 build_sh4_cpp_compiler=true
 build_libraries=true
 
-platform="dreamcast"
+platform="msdos"
 git_transport_prefix="https://github.com"
 gnu_url="ftp://gcc.gnu.org/pub"
 
@@ -815,16 +815,7 @@ else
 fi
 
 # GCC compiles fine with clang, but only if we use libstdc++ instead of libc++.
-if $(detect "g++")
-then
-  export CXX="g++"
-elif $(detect "clang++")
-then
-  export CXX="clang++ -stdlib=libstdc++"
-else
-  log_error "No known C++ compiler could be found!"
-  exit 1
-fi
+export CXX="i586-pc-msdosdjgpp-g++"
 
 # Create and then move into builddir location
 
@@ -963,12 +954,13 @@ configure_and_make () {
 }
 
 # === FOR ALL TARGETS ===
-library_options="--with-newlib --disable-libssp --disable-tls"
+#library_options="--with-newlib --disable-libssp --disable-tls"
+library_options=""
 
 # === ARM TARGET ===
-target="arm-eabi"
+target="x86"
 target_dir=${installdir}/${platform}/${target}
-cpu_options="--with-arch=armv4"
+cpu_options="--with-arch=i586"
 
 # <=== BUILD ARM C TOOLCHAIN ===>
 if ${build_arm_c_toolchain}
@@ -978,12 +970,14 @@ then
   then
     configure_and_make "${gdb_dir}" "${target}"
   fi
-  configure_and_make "${gcc_dir}" "${target}" "${cpu_options} ${library_options} --enable-languages=c --without-headers"
+#  configure_and_make "${gcc_dir}" "${target}" "${cpu_options} ${library_options} --enable-languages=c --without-headers"
 
-  sudo sh -c "cat ${basedir}/scripts/$(target_name ${target}).specs | sed -e s/$(to_upper $(to_variable $(target_name ${target})_include_path))/$(sed_path ${target_dir}/include)/g > ${target_dir}/lib/specs"
+#  sudo sh -c "cat ${basedir}/scripts/$(target_name ${target}).specs | sed -e s/$(to_upper $(to_variable $(target_name ${target})_include_path))/$(sed_path ${target_dir}/include)/g > ${target_dir}/lib/specs"
 #  sudo cp ${basedir}/scripts/$(target_name ${target}).specs ${target_dir}/lib/specs
 fi
 # </=== BUILD ARM C TOOLCHAIN ===>
+
+exit 0
 
 # === SH4 TARGET ===
 target="sh-elf"
